@@ -23,11 +23,11 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
   const report = reports.find((entry) => entry.id === reportId) ?? null;
 
   const relatedEvents = useMemo(
-    () => environment.events.filter((event) => report?.relatedEventIds.includes(event.id)).slice(0, 4),
+    () => environment.events.filter((event) => report?.relatedEventIds.includes(event.id)).slice(0, 3),
     [environment.events, report],
   );
   const relatedAssets = useMemo(
-    () => environment.assets.filter((asset) => report?.relatedAssetIds?.includes(asset.id)).slice(0, 4),
+    () => environment.assets.filter((asset) => report?.relatedAssetIds?.includes(asset.id)).slice(0, 3),
     [environment.assets, report],
   );
 
@@ -58,9 +58,9 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
   };
 
   return (
-    <main className="h-svh overflow-hidden bg-slate-100 px-3 py-3 text-slate-900 print:h-auto print:bg-white print:px-0 print:py-0">
-      <div className="mx-auto flex h-full w-full max-w-[210mm] flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)] print:h-[297mm] print:max-w-none print:rounded-none print:border-0 print:shadow-none">
-        <div className="no-print flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
+    <main className="hcsc-scrollbar min-h-svh overflow-y-auto bg-[linear-gradient(180deg,#eef2f7_0%,#f5f7fb_100%)] px-4 py-5 text-slate-900 print:bg-white print:px-0 print:py-0">
+      <div className="mx-auto flex w-full max-w-[210mm] flex-col overflow-hidden rounded-[28px] border border-slate-200/90 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.1)] print:min-h-[297mm] print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+        <div className="print:hidden flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Professional Print Template</p>
             <p className="mt-1 text-sm text-slate-600">A4 uyumlu HCSC v1 kurumsal rapor görünümü</p>
@@ -73,128 +73,118 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
           </div>
         </div>
 
-        <article className="hcsc-scrollbar flex-1 overflow-hidden px-6 py-5 print:px-8 print:py-7">
-          <div className="grid h-full grid-rows-[auto_auto_auto_auto_1fr_auto] gap-4">
-          <header className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="max-w-3xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Hybrid Cloud Security Console</p>
-                <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-slate-950">{report.title}</h1>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+        <article className="px-6 py-6 print:px-8 print:py-8">
+          <div className="space-y-5">
+            <header className="overflow-hidden rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,#fbfcff_0%,#f5f8fc_100%)]">
+              <div className="border-b border-slate-200/80 px-5 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Hybrid Cloud Security Console</p>
+              </div>
+              <div className="grid gap-5 px-5 py-5 md:grid-cols-[1.35fr,0.65fr]">
+                <div className="max-w-3xl">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Executive Output</p>
+                  <h1 className="mt-2 text-[29px] font-semibold tracking-[-0.03em] text-slate-950">{report.title}</h1>
+                  <p className="mt-3 max-w-2xl text-[13px] leading-6 text-slate-600">
                   {currentOrganization.name} için üretilen bu rapor; hibrit bulut güvenlik görünürlüğünü, Zero Trust kararlarını,
                   deception olaylarını ve uyumluluk etkilerini kurumsal çıktı formatında özetler.
-                </p>
-              </div>
-              <div className="grid min-w-[210px] gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Organization</p>
-                  <p className="mt-1 font-medium text-slate-950">{currentOrganization.name}</p>
+                  </p>
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Prepared By</p>
-                  <p className="mt-1 font-medium text-slate-950">{currentUser?.name ?? "HCSC System"}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Generated At</p>
-                  <p className="mt-1 font-medium text-slate-950">{formatDateTime(report.createdAt)}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Confidentiality</p>
-                  <p className="mt-1 font-medium text-slate-950">Internal / Thesis Prototype</p>
+                <div className="grid gap-2 rounded-[22px] border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+                  <Meta label="Organization" value={currentOrganization.name} />
+                  <Meta label="Prepared By" value={currentUser?.name ?? "HCSC System"} />
+                  <Meta label="Generated At" value={formatDateTime(report.createdAt)} />
+                  <Meta label="Confidentiality" value="Internal / Thesis Prototype" />
                 </div>
               </div>
-            </div>
-          </header>
+            </header>
 
-          <section className="grid gap-3 md:grid-cols-4">
-            <SnapshotCard label="Security Score" value={`${dashboard.securityScore}/100`} />
-            <SnapshotCard label="Critical Events" value={String(environment.events.filter((event) => event.severity === "critical").length)} />
-            <SnapshotCard label="Compliance" value={`${complianceScores.overallScore}%`} />
-            <SnapshotCard label="Report Type" value={report.type} />
-          </section>
+            <section className="grid gap-3 md:grid-cols-4">
+              <SnapshotCard label="Security Score" value={`${dashboard.securityScore}/100`} />
+              <SnapshotCard label="Critical Events" value={String(environment.events.filter((event) => event.severity === "critical").length)} />
+              <SnapshotCard label="Compliance" value={`${complianceScores.overallScore}%`} />
+              <SnapshotCard label="Report Type" value={report.type} />
+            </section>
 
-          <Section title="Executive Summary" compact>
-            <p className="text-sm leading-7 text-slate-700">{report.summary}</p>
-          </Section>
+            <Section title="Executive Summary" compact>
+              <p className="text-[13px] leading-6 text-slate-700">{report.summary}</p>
+            </Section>
 
-          <section className="grid min-h-0 gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-            <div className="grid min-h-0 gap-4">
-              <Section title="Critical Findings">
-                <BulletList items={report.findings.slice(0, 4)} />
-              </Section>
-              <Section title="Event Timeline">
-                {relatedEvents.length ? (
-                  <div className="space-y-2">
-                    {relatedEvents.map((event) => (
-                      <div key={event.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-medium text-slate-950">{event.title}</p>
-                          <Badge label={event.severity} tone={reportToneMap[report.type]} />
-                        </div>
-                        <p className="mt-1 text-sm leading-6 text-slate-700">{event.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyLine text="Bu rapor için ek olay zaman çizelgesi bulunmuyor." />
-                )}
-              </Section>
-            </div>
-
-            <div className="grid min-h-0 gap-4">
-              <Section title="Affected Assets">
-                {relatedAssets.length ? (
-                  <div className="overflow-hidden rounded-xl border border-slate-200">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Asset</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600">Risk</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white">
-                        {relatedAssets.map((asset) => (
-                          <tr key={asset.id}>
-                            <td className="px-3 py-2 font-medium text-slate-900">{asset.name}</td>
-                            <td className="px-3 py-2 text-slate-700">{asset.risk.level}</td>
+            <section className="grid gap-4 lg:grid-cols-[1.08fr,0.92fr]">
+              <div className="space-y-4">
+                <Section title="Critical Findings">
+                  <BulletList items={report.findings.slice(0, 3)} />
+                </Section>
+                <Section title="Affected Assets">
+                  {relatedAssets.length ? (
+                    <div className="overflow-hidden rounded-xl border border-slate-200">
+                      <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium text-slate-600">Asset</th>
+                            <th className="px-3 py-2 text-left font-medium text-slate-600">Risk</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white">
+                          {relatedAssets.map((asset) => (
+                            <tr key={asset.id}>
+                              <td className="px-3 py-2 font-medium text-slate-900">{asset.name}</td>
+                              <td className="px-3 py-2 text-slate-700">{asset.risk.level}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <EmptyLine text="Bu rapora bağlı ek varlık bulunmuyor." />
+                  )}
+                </Section>
+                <Section title="Recommended Actions" compact>
+                  <BulletList items={report.recommendedActions.slice(0, 3)} />
+                </Section>
+              </div>
+
+              <div className="space-y-4">
+                <Section title="Event Timeline">
+                  {relatedEvents.length ? (
+                    <div className="space-y-2">
+                      {relatedEvents.map((event) => (
+                        <div key={event.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-medium text-slate-950">{event.title}</p>
+                            <Badge label={event.severity} tone={reportToneMap[report.type]} />
+                          </div>
+                          <p className="mt-1 text-[13px] leading-5 text-slate-700">{event.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyLine text="Bu rapor için ek olay zaman çizelgesi bulunmuyor." />
+                  )}
+                </Section>
+                <Section title="Risk Matrix">
+                  <BulletList items={report.risks.slice(0, 3)} />
+                </Section>
+                <Section title="Compliance Mapping">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <CompactList
+                      title="NIST CSF"
+                      items={complianceScores.nist.slice(0, 4).map((item) => `${item.name}: ${item.score}%`)}
+                    />
+                    <CompactList
+                      title="KVKK / GDPR"
+                      items={[
+                        `KVKK görünürlüğü ${complianceScores.kvkkScore}% seviyesinde.`,
+                        `GDPR görünürlüğü ${complianceScores.gdprScore}% seviyesinde.`,
+                        "Privacy kapsamlı veri varlıkları transfer ve şifreleme kontrolleriyle izleniyor.",
+                      ]}
+                    />
                   </div>
-                ) : (
-                  <EmptyLine text="Bu rapora bağlı ek varlık bulunmuyor." />
-                )}
-              </Section>
+                </Section>
+              </div>
+            </section>
 
-              <Section title="Risk Matrix">
-                <BulletList items={report.risks.slice(0, 4)} />
-              </Section>
-            </div>
-          </section>
-
-          <section className="grid gap-4 lg:grid-cols-2">
-            <Section title="NIST CSF Mapping">
-              <BulletList items={complianceScores.nist.slice(0, 4).map((item) => `${item.name}: ${item.score}%`)} />
-            </Section>
-            <Section title="KVKK / GDPR Impact">
-              <BulletList
-                items={[
-                  `KVKK görünürlüğü ${complianceScores.kvkkScore}% seviyesinde.`,
-                  `GDPR görünürlüğü ${complianceScores.gdprScore}% seviyesinde.`,
-                  `Privacy kapsamlı veri varlıkları export ve şifreleme kontrolleriyle birlikte izleniyor.`,
-                ]}
-              />
-            </Section>
-          </section>
-
-          <Section title="Recommended Actions" compact>
-            <BulletList items={report.recommendedActions.slice(0, 4)} />
-          </Section>
-
-          <footer className="border-t border-slate-200 pt-4 text-xs text-slate-500">
-            Generated by Hybrid Cloud Security Console • {currentOrganization.name} • {formatDateTime(report.createdAt)}
-          </footer>
+            <footer className="border-t border-slate-200 pt-4 text-xs text-slate-500">
+              Generated by Hybrid Cloud Security Console • {currentOrganization.name} • {formatDateTime(report.createdAt)}
+            </footer>
           </div>
         </article>
       </div>
@@ -206,7 +196,9 @@ function Section({ title, children, compact = false }: { title: string; children
   return (
     <section>
       <h2 className="text-base font-semibold text-slate-950">{title}</h2>
-      <div className={`mt-3 rounded-2xl border border-slate-200 bg-white ${compact ? "p-4" : "p-4"}`}>{children}</div>
+      <div className={`mt-3 rounded-2xl border border-slate-200 bg-white ${compact ? "p-4" : "p-4"} shadow-[0_4px_18px_rgba(15,23,42,0.03)]`}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -220,15 +212,39 @@ function SnapshotCard({ label, value }: { label: string; value: string }) {
   );
 }
 
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">{label}</p>
+      <p className="mt-1.5 font-medium text-slate-950">{value}</p>
+    </div>
+  );
+}
+
 function BulletList({ items }: { items: string[] }) {
   return (
-    <ul className="space-y-2 text-sm leading-6 text-slate-700">
+    <ul className="space-y-2 text-[13px] leading-5 text-slate-700">
       {items.map((item) => (
         <li key={item} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
           {item}
         </li>
       ))}
     </ul>
+  );
+}
+
+function CompactList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">{title}</p>
+      <ul className="mt-2 space-y-2 text-[13px] leading-5 text-slate-700">
+        {items.map((item) => (
+          <li key={item} className="rounded-lg bg-white px-3 py-2 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.18)]">
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

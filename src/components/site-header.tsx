@@ -32,7 +32,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 
 const pageMeta: Record<string, { title: string; description: string }> = {
   "/": {
@@ -126,8 +127,10 @@ export function SiteHeader() {
   } =
     useDemo()
   const { theme, toggleTheme } = useTheme()
+  const { state: sidebarState } = useSidebar()
   const [query, setQuery] = useState("")
   const meta = pageMeta[pathname] ?? pageMeta["/dashboard"]
+  const isSidebarCollapsed = sidebarState === "collapsed"
 
   const matches = useMemo(() => {
     if (!query.trim()) {
@@ -151,12 +154,24 @@ export function SiteHeader() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="data-[orientation=vertical]:h-4" />
 
-        <div className="min-w-0">
-          <Breadcrumbs />
-          <div className="mt-0.5">
+        <div
+          className={cn(
+            "min-w-0 transition-[max-width] duration-200",
+            isSidebarCollapsed
+              ? "max-w-[180px] sm:max-w-[240px] lg:max-w-[320px] xl:max-w-[380px]"
+              : "max-w-[220px] sm:max-w-[320px] lg:max-w-[420px] xl:max-w-[520px]"
+          )}
+        >
+          {!isSidebarCollapsed ? <Breadcrumbs /> : null}
+          <div className="mt-0.5 min-w-0 overflow-hidden">
             <h1 className="truncate text-sm font-semibold">{meta.title}</h1>
-            <p className="truncate text-xs text-muted-foreground">
-              {meta.description} · {currentOrganization.name}
+            <p
+              className={cn(
+                "truncate text-xs text-muted-foreground",
+                isSidebarCollapsed ? "hidden xl:block" : "block"
+              )}
+            >
+              {meta.description}
             </p>
           </div>
         </div>

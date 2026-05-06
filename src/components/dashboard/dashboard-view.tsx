@@ -96,7 +96,7 @@ export function DashboardView() {
         </div>
       </Panel>
 
-      <div className="grid gap-4 2xl:grid-cols-[1.4fr,1fr]">
+      <div className="grid gap-4 xl:grid-cols-[1.28fr,0.92fr]">
         <Panel className="overflow-hidden rounded-[14px] p-0">
           <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3 lg:px-5">
             <div>
@@ -162,14 +162,14 @@ export function DashboardView() {
             </Link>
           </div>
 
-          <DataTable className="min-w-[760px]">
+          <DataTable className="min-w-full table-fixed">
             <DataTableHead>
               <DataTableHeaderRow>
-                <DataTableHeader className="w-[38%]">Asset</DataTableHeader>
-                <DataTableHeader className="w-[16%]">Risk</DataTableHeader>
-                <DataTableHeader className="w-[18%]">Location</DataTableHeader>
-                <DataTableHeader className="w-[12%]">Access</DataTableHeader>
-                <DataTableHeader className="w-[16%]">Owner</DataTableHeader>
+                <DataTableHeader className="w-[35%]">Asset</DataTableHeader>
+                <DataTableHeader className="w-[15%]">Risk</DataTableHeader>
+                <DataTableHeader className="w-[16%]">Location</DataTableHeader>
+                <DataTableHeader className="w-[11%]">Access</DataTableHeader>
+                <DataTableHeader className="w-[23%]">Owner</DataTableHeader>
               </DataTableHeaderRow>
             </DataTableHead>
             <DataTableBody>
@@ -202,7 +202,7 @@ export function DashboardView() {
         </Panel>
       </div>
 
-      <div className="grid gap-4 2xl:grid-cols-[1fr,1.15fr]">
+      <div className="grid gap-4 xl:grid-cols-[0.96fr,1.04fr]">
         <Panel className="overflow-hidden rounded-[14px] p-0">
           <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3 lg:px-5">
             <div>
