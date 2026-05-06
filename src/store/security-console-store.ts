@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
+import { mockAuthAccounts, mockOrganization } from "@/lib/auth-mock-data";
 import { calculateComplianceSnapshot } from "@/lib/compliance-engine";
 import { triggerDeceptionAccess } from "@/lib/deception-engine";
 import {
@@ -11,13 +12,21 @@ import {
   updateEventStatus as updateSecurityEventStatus,
 } from "@/lib/event-engine";
 import { createMockEnvironment } from "@/lib/mock-data";
+import { hasPermission } from "@/lib/permissions";
 import { generateReport, generateReports } from "@/lib/report-engine";
 import { calculateAssetRisk as calculateSingleAssetRisk, calculateIdentityRisk } from "@/lib/risk-engine";
 import { buildDashboardSummary, makeId } from "@/lib/utils";
 import { evaluateZeroTrustRequest } from "@/lib/zero-trust-engine";
 import type {
   AccessRequest,
+  AuditLogItem,
+  AppUser,
+  AuthState,
   DemoEnvironment,
+  NotificationItem,
+  OnboardingPayload,
+  OrganizationProfile,
+  Permission,
   PolicyRule,
   ReportType,
   SecurityEvent,
@@ -47,6 +56,19 @@ type CreateAccessRequestPayload = Omit<
 
 type CreateEventPayload = Parameters<typeof createSecurityEvent>[0];
 
+type AuthActionResult = {
+  success: boolean;
+  error?: string;
+};
+
+type CreateAuditLogPayload = Omit<AuditLogItem, "id" | "timestamp" | "ipAddress" | "device" | "actorId" | "actorName" | "actorRole"> & {
+  actorId?: string | null;
+  actorName?: string;
+  actorRole?: string;
+};
+
+type CreateNotificationPayload = Omit<NotificationItem, "id" | "createdAt" | "read">;
+
 type StoreMeta = {
   selectedAssetId: string | null;
   selectedEventId: string | null;
@@ -55,6 +77,11 @@ type StoreMeta = {
   demoMode: boolean;
   lastSimulationResult: SimulationRunResult | null;
   toasts: ToastMessage[];
+  auth: AuthState;
+  organization: OrganizationProfile;
+  onboardingCompleted: boolean;
+  auditLogs: AuditLogItem[];
+  notifications: NotificationItem[];
 };
 
 export type SecurityConsoleStore = {
@@ -75,6 +102,12 @@ export type SecurityConsoleStore = {
   demoMode: boolean;
   lastSimulationResult: SimulationRunResult | null;
   toasts: ToastMessage[];
+  auth: AuthState;
+  currentUser: AppUser | null;
+  currentOrganization: OrganizationProfile;
+  onboardingCompleted: boolean;
+  auditLogs: AuditLogItem[];
+  notifications: NotificationItem[];
   runSimulation: (scenarioId: string) => void;
   evaluateAccessRequest: (requestId: string) => void;
   createAccessRequest: (payload: CreateAccessRequestPayload) => void;
@@ -101,7 +134,19 @@ export type SecurityConsoleStore = {
   previousDemoStep: () => void;
   dismissToast: (toastId: string) => void;
   runRiskAnalysis: (assetId?: string) => void;
+  hydrateAuthSession: () => void;
+  login: (email: string, password: string) => AuthActionResult;
+  verify2FA: (code: string) => AuthActionResult;
+  logout: () => void;
+  completeOnboarding: (payload: OnboardingPayload) => void;
+  can: (permission: Permission) => boolean;
+  addAuditLog: (payload: CreateAuditLogPayload) => void;
+  addNotification: (payload: CreateNotificationPayload) => void;
+  markNotificationRead: (id: string) => void;
+  clearNotifications: () => void;
 };
+
+const AUTH_SESSION_KEY = "hcsc-auth-session";
 
 const listeners = new Set<() => void>();
 
@@ -123,6 +168,56 @@ function createInitialMeta(): StoreMeta {
     demoMode: false,
     lastSimulationResult: null,
     toasts: [],
+    auth: {
+      hydrated: false,
+      isAuthenticated: false,
+      is2FAVerified: false,
+      currentUserId: null,
+      sessionStartedAt: null,
+      lastLoginAt: null,
+    },
+    organization: mockOrganization,
+    onboardingCompleted: false,
+    auditLogs: [],
+    notifications: [],
+  };
+}
+
+function persistAuthMeta(meta: StoreMeta) {
+  if (typeof window === "undefined") return;
+
+  window.sessionStorage.setItem(
+    AUTH_SESSION_KEY,
+    JSON.stringify({
+      auth: meta.auth,
+      onboardingCompleted: meta.onboardingCompleted,
+      organization: meta.organization,
+      auditLogs: meta.auditLogs.slice(0, 100),
+      notifications: meta.notifications.slice(0, 40),
+    }),
+  );
+}
+
+function readPersistedAuthMeta() {
+  if (typeof window === "undefined") return null;
+
+  const raw = window.sessionStorage.getItem(AUTH_SESSION_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as Pick<StoreMeta, "auth" | "onboardingCompleted" | "organization" | "auditLogs" | "notifications">;
+  } catch {
+    return null;
+  }
+}
+
+function getCurrentActor() {
+  const currentUser = mockAuthAccounts.find((account) => account.id === currentMeta.auth.currentUserId);
+
+  return {
+    actorId: currentUser?.id ?? null,
+    actorName: currentUser?.name ?? "System",
+    actorRole: currentUser?.role ?? "System",
   };
 }
 
@@ -263,7 +358,19 @@ function buildSnapshot(environment: DemoEnvironment, meta: StoreMeta): Omit<
   | "previousDemoStep"
   | "dismissToast"
   | "runRiskAnalysis"
+  | "hydrateAuthSession"
+  | "login"
+  | "verify2FA"
+  | "logout"
+  | "completeOnboarding"
+  | "can"
+  | "addAuditLog"
+  | "addNotification"
+  | "markNotificationRead"
+  | "clearNotifications"
 > {
+  const currentUser = mockAuthAccounts.find((account) => account.id === meta.auth.currentUserId) ?? null;
+
   return {
     environment,
     dashboard: buildDashboardSummary(environment),
@@ -284,6 +391,12 @@ function buildSnapshot(environment: DemoEnvironment, meta: StoreMeta): Omit<
     demoMode: meta.demoMode,
     lastSimulationResult: meta.lastSimulationResult,
     toasts: meta.toasts,
+    auth: meta.auth,
+    currentUser,
+    currentOrganization: meta.organization,
+    onboardingCompleted: meta.onboardingCompleted,
+    auditLogs: meta.auditLogs,
+    notifications: meta.notifications,
   };
 }
 
@@ -293,12 +406,14 @@ let currentMeta = createInitialMeta();
 function setEnvironment(nextEnvironment: MutableEnvironment, metaPatch?: Partial<StoreMeta>) {
   currentEnvironment = deriveEnvironment(nextEnvironment);
   currentMeta = { ...currentMeta, ...metaPatch };
+  persistAuthMeta(currentMeta);
   store = { ...buildSnapshot(currentEnvironment, currentMeta), ...actions };
   emitChange();
 }
 
 function setMeta(metaPatch: Partial<StoreMeta>) {
   currentMeta = { ...currentMeta, ...metaPatch };
+  persistAuthMeta(currentMeta);
   store = { ...buildSnapshot(currentEnvironment, currentMeta), ...actions };
   emitChange();
 }
@@ -315,6 +430,48 @@ function pushToast(toast: Omit<ToastMessage, "id">) {
 
   setMeta({
     toasts: [{ id: makeId("toast"), ...toast }, ...currentMeta.toasts].slice(0, 5),
+  });
+}
+
+function pushNotification(payload: CreateNotificationPayload) {
+  const duplicate = currentMeta.notifications.find(
+    (entry) =>
+      entry.title === payload.title &&
+      entry.description === payload.description &&
+      entry.type === payload.type,
+  );
+
+  if (duplicate) return;
+
+  setMeta({
+    notifications: [
+      {
+        id: makeId("ntf"),
+        createdAt: new Date().toISOString(),
+        read: false,
+        ...payload,
+      },
+      ...currentMeta.notifications,
+    ].slice(0, 40),
+  });
+}
+
+function pushAuditLog(payload: CreateAuditLogPayload) {
+  const actor = getCurrentActor();
+  setMeta({
+    auditLogs: [
+      {
+        id: makeId("audit"),
+        timestamp: new Date().toISOString(),
+        ipAddress: "10.24.8.14",
+        device: "Managed macOS / Demo Browser",
+        actorId: payload.actorId ?? actor.actorId,
+        actorName: payload.actorName ?? actor.actorName,
+        actorRole: payload.actorRole ?? actor.actorRole,
+        ...payload,
+      },
+      ...currentMeta.auditLogs,
+    ].slice(0, 200),
   });
 }
 
@@ -463,8 +620,27 @@ const actions: Pick<
   | "previousDemoStep"
   | "dismissToast"
   | "runRiskAnalysis"
+  | "hydrateAuthSession"
+  | "login"
+  | "verify2FA"
+  | "logout"
+  | "completeOnboarding"
+  | "can"
+  | "addAuditLog"
+  | "addNotification"
+  | "markNotificationRead"
+  | "clearNotifications"
 > = {
   runSimulation(scenarioId) {
+    pushAuditLog({
+      action: "simulation_started",
+      module: "Simulations",
+      target: scenarioId,
+      severity: "info",
+      result: "success",
+      details: `${scenarioId} senaryosu tetiklendi.`,
+    });
+
     if (scenarioId === "sim-4") {
       actions.triggerDeception(undefined, "id-finance-batch");
       return;
@@ -630,6 +806,22 @@ const actions: Pick<
       description: "İlgili olaylar, risk skorları ve raporlar güncellendi.",
       tone: "success",
     });
+    pushNotification({
+      title: "Simülasyon tamamlandı",
+      description: run.summary,
+      type: "simulation_completed",
+      severity: "info",
+      module: "Simulations",
+      actionHref: "/simulations",
+    });
+    pushAuditLog({
+      action: "simulation_completed",
+      module: "Simulations",
+      target: scenarioId,
+      severity: generatedEventIds.length ? "high" : "info",
+      result: "success",
+      details: run.summary,
+    });
   },
 
   evaluateAccessRequest(requestId) {
@@ -685,6 +877,32 @@ const actions: Pick<
       description: `${identity.name} için ${evaluation.decision} kararı oluşturuldu.`,
       tone: "policy",
     });
+    pushAuditLog({
+      action: "access_request_evaluated",
+      module: "Access Requests",
+      target: `${identity.name} -> ${asset.name}`,
+      severity: evaluation.decision === "isolate" ? "critical" : evaluation.decision === "deny" ? "high" : "info",
+      result: "success",
+      details: `${evaluation.decision} kararı üretildi.`,
+    });
+    pushAuditLog({
+      action: "zero_trust_decision_generated",
+      module: "Policy Engine",
+      target: requestId,
+      severity: evaluation.decision === "isolate" ? "critical" : evaluation.decision === "deny" ? "high" : "info",
+      result: "success",
+      details: evaluation.reasons.join(" "),
+    });
+    if (status === "step_up") {
+      pushNotification({
+        title: "Ek doğrulama gereken erişim talebi",
+        description: `${identity.name} için step-up auth gerekiyor.`,
+        type: "access_request_pending",
+        severity: "medium",
+        module: "Access Requests",
+        actionHref: "/access-requests",
+      });
+    }
   },
 
   createAccessRequest(payload) {
@@ -760,6 +978,22 @@ const actions: Pick<
       description: action ? `${action} aksiyonu uygulandı.` : "Önerilen playbook aksiyonları yürütüldü.",
       tone: "success",
     });
+    pushNotification({
+      title: "SOAR playbook tamamlandı",
+      description: action ? `${action} aksiyonu ${event.title} olayı için yürütüldü.` : `${event.title} için playbook çalıştırıldı.`,
+      type: "playbook_completed",
+      severity: event.severity,
+      module: "Events",
+      actionHref: "/events",
+    });
+    pushAuditLog({
+      action: "playbook_executed",
+      module: "Events",
+      target: event.title,
+      severity: event.severity === "critical" ? "critical" : event.severity === "high" ? "high" : "info",
+      result: "success",
+      details: action ? `${action} aksiyonu uygulandı.` : "Önerilen playbook yürütüldü.",
+    });
   },
 
   triggerDeception(deceptionAssetId, identityId) {
@@ -802,6 +1036,22 @@ const actions: Pick<
       description: incident.recommendation.summary,
       tone: "deception",
     });
+    pushNotification({
+      title: "Kritik deception alarmı",
+      description: incident.recommendation.summary,
+      type: "deception_alarm",
+      severity: "critical",
+      module: "Deception",
+      actionHref: "/deception",
+    });
+    pushAuditLog({
+      action: "deception_triggered",
+      module: "Deception",
+      target: incident.updatedDeception.name,
+      severity: "critical",
+      result: "success",
+      details: `${incident.updatedIdentity.name} deception varlığına erişti.`,
+    });
   },
 
   calculateAssetRisk(assetId) {
@@ -818,6 +1068,14 @@ const actions: Pick<
       description: `${asset.name} için risk skoru yeniden hesaplandı.`,
       tone: "info",
     });
+    pushAuditLog({
+      action: "asset_risk_recalculated",
+      module: "Data Assets",
+      target: asset.name,
+      severity: "info",
+      result: "success",
+      details: "Tekil varlık risk skoru yeniden hesaplandı.",
+    });
   },
 
   recalculateAllRisks() {
@@ -826,6 +1084,14 @@ const actions: Pick<
       title: "Tüm risk skorları güncellendi",
       description: "Asset ve kimlik riskleri tekrar hesaplandı.",
       tone: "success",
+    });
+    pushAuditLog({
+      action: "asset_risk_recalculated",
+      module: "Data Assets",
+      target: "all-assets",
+      severity: "info",
+      result: "success",
+      details: "Tüm varlık risk skorları yeniden hesaplandı.",
     });
   },
 
@@ -841,6 +1107,22 @@ const actions: Pick<
       description: type ? `${type} raporu yeniden üretildi.` : "Tüm raporlar yenilendi.",
       tone: "compliance",
     });
+    pushNotification({
+      title: "Rapor hazır",
+      description: type ? `${type} raporu güncellendi.` : "Rapor seti yenilendi.",
+      type: "report_ready",
+      severity: "info",
+      module: "Reports",
+      actionHref: "/reports",
+    });
+    pushAuditLog({
+      action: "report_generated",
+      module: "Reports",
+      target: type ?? "all-reports",
+      severity: "info",
+      result: "success",
+      details: type ? `${type} raporu üretildi.` : "Tüm raporlar yeniden üretildi.",
+    });
   },
 
   updateComplianceScores() {
@@ -849,6 +1131,22 @@ const actions: Pick<
       title: "Uyumluluk skorları yeniden hesaplandı",
       description: "NIST CSF ve KVKK/GDPR görünürlüğü güncellendi.",
       tone: "compliance",
+    });
+    pushNotification({
+      title: "Uyumluluk skoru değişti",
+      description: `NIST CSF skoru ${store.complianceScores.overallScore}% olarak güncellendi.`,
+      type: "compliance_changed",
+      severity: "info",
+      module: "Compliance",
+      actionHref: "/compliance",
+    });
+    pushAuditLog({
+      action: "compliance_recalculated",
+      module: "Compliance",
+      target: "nist-csf",
+      severity: "info",
+      result: "success",
+      details: "Uyumluluk göstergeleri yeniden hesaplandı.",
     });
   },
 
@@ -940,6 +1238,14 @@ const actions: Pick<
       description: "Aktif savunma katmanına yeni bir lure eklendi.",
       tone: "deception",
     });
+    pushAuditLog({
+      action: "deception_asset_created",
+      module: "Deception",
+      target: "generated-decoy",
+      severity: "info",
+      result: "success",
+      details: "Yeni deception varlığı oluşturuldu.",
+    });
   },
 
   startDemoScenario() {
@@ -1007,6 +1313,255 @@ const actions: Pick<
       return;
     }
     actions.recalculateAllRisks();
+  },
+
+  hydrateAuthSession() {
+    if (currentMeta.auth.hydrated) return;
+    const persisted = readPersistedAuthMeta();
+
+    if (!persisted) {
+      setMeta({
+        auth: {
+          ...currentMeta.auth,
+          hydrated: true,
+        },
+      });
+      return;
+    }
+
+    setMeta({
+      auth: {
+        ...persisted.auth,
+        hydrated: true,
+      },
+      onboardingCompleted: persisted.onboardingCompleted,
+      organization: persisted.organization ?? currentMeta.organization,
+    });
+  },
+
+  login(email, password) {
+    pushAuditLog({
+      action: "login_attempt",
+      module: "Authentication",
+      target: email,
+      severity: "info",
+      result: "success",
+      details: "Kullanıcı giriş denemesi yaptı.",
+      actorName: email,
+      actorRole: "Anonymous",
+      actorId: null,
+    });
+    const account = mockAuthAccounts.find(
+      (entry) => entry.email.toLowerCase() === email.trim().toLowerCase() && entry.password === password,
+    );
+
+    if (!account) {
+      pushToast({
+        title: "Giriş başarısız",
+        description: "E-posta veya parola doğrulanamadı.",
+        tone: "warning",
+      });
+      pushAuditLog({
+        action: "login_failed",
+        module: "Authentication",
+        target: email,
+        severity: "warning",
+        result: "failure",
+        details: "E-posta veya parola doğrulanamadı.",
+        actorName: email,
+        actorRole: "Anonymous",
+        actorId: null,
+      });
+      return {
+        success: false,
+        error: "E-posta veya parola hatalı.",
+      };
+    }
+
+    const now = new Date().toISOString();
+    setMeta({
+      auth: {
+        hydrated: true,
+        isAuthenticated: true,
+        is2FAVerified: false,
+        currentUserId: account.id,
+        sessionStartedAt: null,
+        lastLoginAt: now,
+      },
+    });
+
+    pushToast({
+      title: "Kimlik doğrulandı",
+      description: "İkinci faktör kodunu doğrulayarak oturumu tamamlayın.",
+      tone: "policy",
+    });
+    pushAuditLog({
+      action: "login_success",
+      module: "Authentication",
+      target: account.email,
+      severity: "info",
+      result: "success",
+      details: "Kullanıcı parolayla doğrulandı, 2FA bekleniyor.",
+      actorName: account.name,
+      actorRole: account.role,
+      actorId: account.id,
+    });
+
+    return {
+      success: true,
+    };
+  },
+
+  verify2FA(code) {
+    const currentUser = mockAuthAccounts.find((entry) => entry.id === currentMeta.auth.currentUserId);
+    if (!currentUser) {
+      return {
+        success: false,
+        error: "Önce giriş yapmalısın.",
+      };
+    }
+
+    if (code.trim() !== currentUser.twoFactorCode) {
+      pushToast({
+        title: "2FA doğrulanamadı",
+        description: "Demo kodu 123456 ile eşleşen 6 haneli kod bekleniyor.",
+        tone: "warning",
+      });
+      pushAuditLog({
+        action: "two_factor_failed",
+        module: "Authentication",
+        target: currentUser.email,
+        severity: "warning",
+        result: "failure",
+        details: "Geçersiz 2FA kodu girildi.",
+      });
+      return {
+        success: false,
+        error: "Doğrulama kodu hatalı.",
+      };
+    }
+
+    const now = new Date().toISOString();
+    setMeta({
+      auth: {
+        ...currentMeta.auth,
+        hydrated: true,
+        isAuthenticated: true,
+        is2FAVerified: true,
+        sessionStartedAt: now,
+        lastLoginAt: now,
+      },
+    });
+
+    pushToast({
+      title: "Güvenli oturum açıldı",
+      description: "Zero Trust ve aktif savunma konsolu kullanıma hazır.",
+      tone: "success",
+    });
+    pushAuditLog({
+      action: "two_factor_verified",
+      module: "Authentication",
+      target: currentUser.email,
+      severity: "info",
+      result: "success",
+      details: "2FA doğrulaması tamamlandı.",
+    });
+
+    return {
+      success: true,
+    };
+  },
+
+  logout() {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(AUTH_SESSION_KEY);
+    }
+
+    setMeta({
+      auth: {
+        hydrated: true,
+        isAuthenticated: false,
+        is2FAVerified: false,
+        currentUserId: null,
+        sessionStartedAt: null,
+        lastLoginAt: null,
+      },
+      onboardingCompleted: false,
+    });
+
+    pushToast({
+      title: "Oturum kapatıldı",
+      description: "Güvenli oturum sonlandırıldı.",
+      tone: "info",
+    });
+    pushAuditLog({
+      action: "logout",
+      module: "Authentication",
+      target: "session",
+      severity: "info",
+      result: "success",
+      details: "Kullanıcı oturumu kapatıldı.",
+    });
+  },
+
+  completeOnboarding(payload) {
+    const nextOrganization: OrganizationProfile = {
+      ...currentMeta.organization,
+      name: payload.organizationName || currentMeta.organization.name,
+      cloudMode: payload.cloudMode,
+      complianceFrameworks: payload.complianceFrameworks,
+    };
+
+    const nextEnvironment = payload.seedDemoData ? deriveEnvironment(createMockEnvironment()) : currentEnvironment;
+
+    setEnvironment(
+      nextEnvironment,
+      {
+        organization: nextOrganization,
+        onboardingCompleted: true,
+      },
+    );
+
+    if (payload.runInitialScan) {
+      actions.recalculateAllRisks();
+    }
+
+    pushToast({
+      title: "Onboarding tamamlandı",
+      description: "Organizasyon profili oluşturuldu ve konsol kullanıma hazır.",
+      tone: "success",
+    });
+    pushAuditLog({
+      action: "onboarding_completed",
+      module: "Onboarding",
+      target: nextOrganization.name,
+      severity: "info",
+      result: "success",
+      details: `${payload.cloudMode} kurulumu ve ${payload.complianceFrameworks.join(", ")} çerçeveleri etkinleştirildi.`,
+    });
+  },
+
+  can(permission) {
+    const currentUser = mockAuthAccounts.find((entry) => entry.id === currentMeta.auth.currentUserId);
+    return hasPermission(currentUser?.role, permission);
+  },
+
+  addAuditLog(payload) {
+    pushAuditLog(payload);
+  },
+
+  addNotification(payload) {
+    pushNotification(payload);
+  },
+
+  markNotificationRead(id) {
+    setMeta({
+      notifications: currentMeta.notifications.map((item) => (item.id === id ? { ...item, read: true } : item)),
+    });
+  },
+
+  clearNotifications() {
+    setMeta({ notifications: [] });
   },
 };
 

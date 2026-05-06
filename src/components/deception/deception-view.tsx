@@ -52,6 +52,26 @@ export function DeceptionView() {
         </div>
       </Panel>
 
+      <Panel>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+              Sahte Veritabanı Tuzak Senaryosu
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">legacy-customer-db-shadow</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-secondary)]">
+              Bu senaryo, saldırganın gerçek veri içermeyen ancak gerçekçi görünen bir sahte veritabanına erişmeye çalışması durumunda sistemin erken uyarı üretmesini simüle eder.
+            </p>
+            <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">
+              Bu kaynak gerçek veri içermez. Tez kapsamında aktif savunma/deception yaklaşımını göstermek için tasarlanmış güvenli bir simülasyondur.
+            </p>
+          </div>
+          <Button onClick={() => triggerDeception("dec-9", "id-legacy-token")}>
+            Sahte Veritabanı Erişimini Simüle Et
+          </Button>
+        </div>
+      </Panel>
+
       <div className="grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
         <Panel className="p-0">
           <div className="border-b border-[var(--border)] px-5 py-4">
@@ -81,6 +101,7 @@ export function DeceptionView() {
 
                   <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
                     <MetricField label="Real Data" value="Hayır" />
+                    <MetricField label="Fake Type" value={deception.fakeType ?? "storage"} />
                     <MetricField label="Lure Score" value={String(deception.lureScore)} />
                     <MetricField label="Trigger Count" value={String(deception.triggerCount)} />
                     <MetricField label="Mapped Threat" value={deception.mappedThreat} />
@@ -171,6 +192,8 @@ export function DeceptionView() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm">
+              <MetricField label="Contains Real Data" value={selected.containsRealData ? "Evet" : "Hayır"} />
+              <MetricField label="Fake Type" value={selected.fakeType ?? "storage"} />
               <MetricField label="Lure Score" value={String(selected.lureScore)} />
               <MetricField label="Trigger Count" value={String(selected.triggerCount)} />
               <MetricField label="Last Triggered" value={selected.lastTriggeredAt ? formatDateTime(selected.lastTriggeredAt) : "Henüz yok"} />

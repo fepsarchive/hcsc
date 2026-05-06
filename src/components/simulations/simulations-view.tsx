@@ -30,7 +30,7 @@ export function SimulationsView() {
           </ActionButton>
           <Link
             href="/presentation"
-            className="inline-flex h-10 items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)]"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[13px] font-medium text-[var(--text-secondary)] transition hover:bg-[color-mix(in_srgb,var(--surface)_86%,white_5%)] hover:text-[var(--text-primary)]"
           >
             Presentation Mode
           </Link>
@@ -56,7 +56,7 @@ export function SimulationsView() {
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           {environment.simulations.map((simulation) => (
-            <div key={simulation.id} className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
+            <div key={simulation.id} className="flex min-h-[260px] flex-col rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold text-[var(--text-primary)]">{simulation.title}</p>
@@ -77,7 +77,7 @@ export function SimulationsView() {
                   <Badge key={control} label={control} tone="neutral" />
                 ))}
               </div>
-              <ActionButton className="mt-4" onClick={() => runSimulation(simulation.id)}>
+              <ActionButton className="mt-auto self-start" onClick={() => runSimulation(simulation.id)}>
                 Senaryoyu Çalıştır
               </ActionButton>
             </div>

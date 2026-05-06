@@ -82,6 +82,130 @@ export type ReportType =
   | "privacy"
   | "demo";
 
+export type UserRole =
+  | "Security Admin"
+  | "Cloud Security Analyst"
+  | "Compliance Officer"
+  | "Auditor"
+  | "Executive";
+
+export type UserStatus = "active" | "invited" | "suspended";
+export type Permission =
+  | "view_dashboard"
+  | "view_assets"
+  | "manage_assets"
+  | "evaluate_access"
+  | "run_playbook"
+  | "trigger_deception"
+  | "create_deception_asset"
+  | "view_compliance"
+  | "generate_report"
+  | "print_report"
+  | "manage_settings"
+  | "view_audit_logs"
+  | "run_simulation"
+  | "access_presentation_mode";
+
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatarInitials: string;
+  department: string;
+  mfaEnabled: boolean;
+  status: UserStatus;
+  lastLoginAt: string;
+}
+
+export interface OrganizationProfile {
+  id: string;
+  name: string;
+  plan: string;
+  region: string;
+  complianceFrameworks: string[];
+  cloudMode: "Private Cloud" | "Public Cloud" | "Hybrid Cloud";
+  demoMode: boolean;
+}
+
+export interface AuthState {
+  hydrated: boolean;
+  isAuthenticated: boolean;
+  is2FAVerified: boolean;
+  currentUserId: string | null;
+  sessionStartedAt: string | null;
+  lastLoginAt: string | null;
+}
+
+export interface OnboardingPayload {
+  organizationName: string;
+  cloudMode: OrganizationProfile["cloudMode"];
+  complianceFrameworks: string[];
+  seedDemoData: boolean;
+  runInitialScan: boolean;
+}
+
+export type AuditSeverity = "info" | "warning" | "high" | "critical";
+export type AuditResult = "success" | "failure" | "blocked";
+export type AuditAction =
+  | "login_attempt"
+  | "login_success"
+  | "login_failed"
+  | "two_factor_verified"
+  | "two_factor_failed"
+  | "logout"
+  | "onboarding_completed"
+  | "access_request_evaluated"
+  | "zero_trust_decision_generated"
+  | "deception_triggered"
+  | "deception_asset_created"
+  | "playbook_executed"
+  | "report_generated"
+  | "report_printed"
+  | "compliance_recalculated"
+  | "asset_risk_recalculated"
+  | "simulation_started"
+  | "simulation_completed"
+  | "unauthorized_action_attempt"
+  | "settings_updated";
+
+export interface AuditLogItem {
+  id: string;
+  actorId: string | null;
+  actorName: string;
+  actorRole: string;
+  action: AuditAction;
+  module: string;
+  target: string;
+  severity: AuditSeverity;
+  result: AuditResult;
+  timestamp: string;
+  ipAddress: string;
+  device: string;
+  details: string;
+}
+
+export type NotificationType =
+  | "critical_event"
+  | "deception_alarm"
+  | "report_ready"
+  | "compliance_changed"
+  | "playbook_completed"
+  | "access_request_pending"
+  | "simulation_completed";
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  description: string;
+  type: NotificationType;
+  severity: EventSeverity | "info";
+  module: string;
+  read: boolean;
+  createdAt: string;
+  actionHref?: string;
+}
+
 export interface RiskAssessment {
   score: number;
   level: RiskLevel;

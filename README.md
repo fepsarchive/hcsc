@@ -1,129 +1,141 @@
-# Hybrid Cloud Security Console
+# HCSC v1.0
 
-Hybrid Cloud Security Console (HCSC), bitirme tezimiz olan **“Hibrit Bulut Ortamında Veri Depolama ve Yönetimi İçin Aktif Savunma Tabanlı Güvenlik Mimarisi Tasarımı”** için geliştirilen web tabanlı güvenlik konsolu prototipidir.
+Hybrid Cloud Security Console (HCSC), **“Hibrit Bulut Ortamında Veri Depolama ve Yönetimi İçin Aktif Savunma Tabanlı Güvenlik Mimarisi Tasarımı”** başlıklı bitirme tezinin uygulama/prototip çözümüdür.
 
-Bu proje, akademik çözümü ürünleştirilebilir bir prototipe dönüştürmeyi hedefler. Uygulama; veri varlıklarını sınıflandırır, risk skorları üretir, Zero Trust erişim kararlarını simüle eder, deception tabanlı aktif savunma akışları sunar, SIEM/SOAR olay yönetimi görünürlüğü sağlar ve NIST CSF 2.0 ile KVKK/GDPR uyumluluk katmanını bir araya getirir.
+Uygulama; veri varlıklarını sınıflandıran, Zero Trust erişim kararları üreten, deception tabanlı aktif savunma senaryolarını güvenli simülasyon olarak çalıştıran, SIEM/SOAR olay görünürlüğü sağlayan ve NIST CSF 2.0 ile KVKK/GDPR uyumluluk etkilerini raporlayan bir güvenlik konsolu olarak tasarlanmıştır.
 
-## Amaç
+## V1.0 modülleri
 
-- Hibrit bulut veri depolama mimarisini görünür kılmak
-- Veri varlıkları için risk analizi üretmek
-- Zero Trust Architecture mantığını çalışan demo ile göstermek
-- MITRE Engage yaklaşımını deception storage üzerinden simüle etmek
-- SIEM/SOAR benzeri olay yönetimi ve playbook akışı göstermek
-- NIST CSF 2.0, ISO 27001, KVKK ve GDPR görünürlüğü sunmak
-- Tez savunmasında adım adım gösterilebilecek etkileyici bir demo akışı sağlamak
+- Login ve 2FA doğrulama
+- Protected routes ve rol tabanlı görünürlük
+- Dashboard
+- Data Assets
+- Access Requests
+- Policy Engine
+- Deception / Sahte veritabanı senaryosu
+- Events / SIEM-SOAR
+- Compliance
+- Threat Matrix
+- Reports
+- Professional print report template
+- Simulations
+- Presentation Mode
+- Audit Logs
+- Notification Center
+- Settings
+- Onboarding
+- Final Checklist
 
-## Teknoloji Stack
+## Demo kullanıcılar
 
-- Next.js App Router
-- TypeScript
-- React
-- Tailwind CSS
-- Local mock data
-- Merkezi React Context store
+- `security.admin@hcsc.local`
+- `analyst@hcsc.local`
 
-## Sayfalar
+Parola:
 
-- `Dashboard`
-- `Cloud Map`
-- `Data Assets`
-- `Access Requests`
-- `Policy Engine`
-- `Deception`
-- `Event Center`
-- `Compliance`
-- `Threat Matrix`
-- `Reports`
-- `Simulations`
-- `Presentation Mode`
-- `Final Checklist`
+```txt
+demo123
+```
 
-## Simülasyonlar
+2FA demo kodu:
 
-- MFA olmadan kritik veriye erişim
-- Mesai dışı export
-- Public cloud'da şifrelenmemiş hassas veri
-- Deception bucket erişimi
-- Üçüncü taraf API anahtarı anomalisi
-- Ransomware davranış göstergesi
-- İç kullanıcı yetki aşımı
-- API unrestricted resource consumption
-- Loglama kapalı kaynak tespiti
+```txt
+123456
+```
 
-## Demo Akışı
+## Executive demo nasıl çalıştırılır?
 
-Uygulama içinde `Demo Senaryosu Başlat` özelliği vardır. Bu akış aşağıdaki zinciri görünür kılar:
+1. `/login` ekranında bir demo kullanıcı seç.
+2. Parola olarak `demo123` gir.
+3. `/verify-2fa` ekranında `123456` kodunu doğrula.
+4. Gerekirse onboarding’i tamamla.
+5. Dashboard veya Simulations ekranında `Demo Senaryosu Başlat` aksiyonunu çalıştır.
+6. Akış şu modüllere yansır:
+   - Access Requests
+   - Events / SIEM-SOAR
+   - Deception
+   - Compliance
+   - Reports
+   - Presentation Mode
+   - Audit Logs
+   - Notification Center
 
-1. Hibrit bulut veri varlıkları görünür olur.
-2. Kritik müşteri verisine mesai dışı ve MFA olmadan export erişimi denenir.
-3. Zero Trust Policy Engine bağlamsal sinyalleri analiz eder.
-4. Sonuç Event Center'a SIEM olayı olarak düşer.
-5. SOAR aksiyonları önerilir.
-6. Aynı şüpheli servis hesabı deception storage alanına erişmeye çalışır.
-7. `deception_triggered` kritik olayı oluşur.
-8. Dashboard güvenlik skoru etkilenir.
-9. Compliance katmanında Detect ve Respond skorları yeniden hesaplanır.
-10. Reports sayfasında Demo Senaryo Raporu görünür.
+## Fake database deception nasıl test edilir?
 
-## Akademik Dayanaklar
+`/deception` sayfasındaki **Sahte Veritabanı Tuzak Senaryosu** kartını kullan.
 
-- NIST Cybersecurity Framework 2.0
-  - Govern
-  - Identify
-  - Protect
-  - Detect
-  - Respond
-  - Recover
-- NIST Zero Trust Architecture
-  - Policy Engine
-  - Policy Administrator
-  - Policy Enforcement Point
-  - sürekli doğrulama
-  - en az ayrıcalık
-  - risk tabanlı erişim kararı
-- MITRE Engage
-  - deception
-  - adversary engagement
-  - erken tespit
-- OWASP API Security Top 10 2023
-  - broken object level authorization
-  - broken authentication
-  - unrestricted resource consumption
-  - unsafe API consumption
-- KVKK / GDPR
-  - kişisel veri sınıflandırması
-  - saklama süresi
-  - veri imha / anonimleştirme
-  - yurt dışı aktarım riski
-  - erişim logları
+Senaryo:
 
-## Güvenlik ve Etik Sınırlar
+- Sahte veritabanı: `legacy-customer-db-shadow`
+- Şüpheli kimlik: `legacy-api-token`
+- Olay: `deception_triggered`
+- Severity: `critical`
+- Önerilen aksiyonlar:
+  - `isolate_identity`
+  - `revoke_token`
+  - `create_ticket`
+  - `notify_security_team`
 
-- Gerçek saldırı kodu yoktur.
-- Exploit, malware, ransomware veya yetkisiz erişim aracı içermez.
-- Hack-back uygulanmaz.
-- Deception alanları gerçek veri içermez.
-- Tüm saldırı akışları güvenli mock ve simülasyon olarak tasarlanmıştır.
+Bu akış gerçek veri içermez ve yalnızca güvenli simülasyon olarak çalışır.
 
-## Çalıştırma
+## Print report nasıl alınır?
+
+1. `/reports` sayfasına git.
+2. Bir rapor kartından `Print Report` seç.
+3. `/reports/[id]/print` sayfası açılır.
+4. Yazdır butonuyla `window.print()` çağrılır ve print audit log’u oluşur.
+
+## Nasıl çalıştırılır?
 
 ```bash
 npm install
 npm run dev
 ```
 
-Tarayıcıda `http://localhost:3000` adresini aç.
+Varsayılan adres:
 
-## Build ve Lint
+[http://localhost:3000](http://localhost:3000)
+
+Port doluysa Next.js uygun başka bir port seçebilir.
+
+## Build komutları
 
 ```bash
 npm run lint
 npm run build
 ```
 
+## Güvenlik ve etik sınırlar
+
+Bu uygulama:
+
+- gerçek saldırı yapmaz
+- exploit çalıştırmaz
+- malware veya ransomware içermez
+- saldırgana saldırmaz
+- hack-back yapmaz
+- gerçek veri kullanmaz
+
+Deception kaynakları:
+
+- sahte database
+- sahte bucket/storage
+- sahte API endpoint
+- sahte token store
+- sahte log archive
+
+ve yalnızca **erken tespit, loglama, alarm, izolasyon önerisi ve raporlama** amacıyla güvenli simülasyon olarak çalışır.
+
+## Akademik dayanaklar
+
+- NIST Cybersecurity Framework 2.0
+- NIST Zero Trust Architecture
+- MITRE Engage
+- OWASP API Security
+- KVKK / GDPR
+
 ## Notlar
 
-- Kod tabanı backend'e hazır olacak şekilde modüler tutulmuştur.
-- Mock data ve motorlar ayrı katmanlarda tutulur.
-- İleride Prisma/PostgreSQL veya API tabanı eklenebilir.
+- Arayüz shadcn/ui `dashboard-01` tasarım dili üzerine kuruludur.
+- Veri katmanı local mock state ve merkezi store ile çalışır.
+- Mimari ileride API ve veritabanı katmanına bağlanabilecek şekilde modüler tutulmuştur.

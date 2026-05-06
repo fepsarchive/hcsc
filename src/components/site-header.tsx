@@ -2,14 +2,34 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { FileTextIcon, MoonStarIcon, PlayIcon, SearchIcon, SunMediumIcon } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import {
+  BellIcon,
+  ChevronDownIcon,
+  FileTextIcon,
+  LogOutIcon,
+  MoonStarIcon,
+  PlayIcon,
+  SearchIcon,
+  ShieldCheckIcon,
+  SunMediumIcon,
+  UserCircle2Icon,
+} from "lucide-react"
 
 import { Breadcrumbs } from "@/components/layout/breadcrumbs"
 import { useDemo } from "@/components/layout/demo-provider"
 import { useTheme } from "@/components/layout/theme-provider"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -71,6 +91,14 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     title: "Final Checklist",
     description: "Teslim ve savunma gereksinim kontrolü",
   },
+  "/settings": {
+    title: "Settings",
+    description: "Profil, oturum ve organizasyon ayarları",
+  },
+  "/audit-logs": {
+    title: "Audit Logs",
+    description: "Kimlik, karar, rapor ve müdahale kayıtları",
+  },
 }
 
 const quickTargets = [
@@ -81,8 +109,22 @@ const quickTargets = [
 ] as const
 
 export function SiteHeader() {
+  const router = useRouter()
   const pathname = usePathname()
-  const { environment, dashboard, startDemoScenario, generateReport } = useDemo()
+  const {
+    environment,
+    dashboard,
+    startDemoScenario,
+    generateReport,
+    currentUser,
+    currentOrganization,
+    logout,
+    can,
+    notifications,
+    markNotificationRead,
+    clearNotifications,
+  } =
+    useDemo()
   const { theme, toggleTheme } = useTheme()
   const [query, setQuery] = useState("")
   const meta = pageMeta[pathname] ?? pageMeta["/dashboard"]
@@ -101,6 +143,7 @@ export function SiteHeader() {
 
     return [...pageMatches, ...assetMatches].slice(0, 6)
   }, [environment.assets, query])
+  const unreadNotifications = notifications.filter((item) => !item.read).length
 
   return (
     <header className="sticky top-0 z-20 flex h-(--header-height) shrink-0 items-center border-b bg-background/95 backdrop-blur">
@@ -112,7 +155,9 @@ export function SiteHeader() {
           <Breadcrumbs />
           <div className="mt-0.5">
             <h1 className="truncate text-sm font-semibold">{meta.title}</h1>
-            <p className="truncate text-xs text-muted-foreground">{meta.description}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {meta.description} · {currentOrganization.name}
+            </p>
           </div>
         </div>
 
@@ -148,13 +193,126 @@ export function SiteHeader() {
             {theme === "dark" ? <SunMediumIcon /> : <MoonStarIcon />}
             {theme === "dark" ? "Light" : "Dark"}
           </Button>
-          <Button size="sm" onClick={startDemoScenario}>
+          <Button
+            size="sm"
+            onClick={startDemoScenario}
+            disabled={!can("run_simulation")}
+            title={!can("run_simulation") ? "Bu aksiyon için uygun rol gerekir." : undefined}
+          >
             <PlayIcon />
             Demo Senaryosu Başlat
           </Button>
-          <Button variant="outline" size="icon-sm" aria-label="Hızlı rapor üret" onClick={() => generateReport()}>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Hızlı rapor üret"
+            onClick={() => generateReport()}
+            disabled={!can("generate_report")}
+            title={!can("generate_report") ? "Bu aksiyon için rapor üretme yetkisi gerekir." : undefined}
+          >
             <FileTextIcon />
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon-sm" className="relative" aria-label="Bildirim merkezi">
+                <BellIcon />
+                {unreadNotifications ? (
+                  <span className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                    {unreadNotifications}
+                  </span>
+                ) : null}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-96">
+              <DropdownMenuLabel className="flex items-center justify-between gap-2">
+                <span>Notification Center</span>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => clearNotifications()}>
+                  Clear all
+                </Button>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {notifications.length ? (
+                <div className="max-h-[420px] overflow-y-auto">
+                  {notifications.slice(0, 10).map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      className="flex cursor-pointer flex-col items-start gap-1 px-3 py-3"
+                      onClick={() => {
+                        markNotificationRead(notification.id)
+                        if (notification.actionHref) {
+                          router.push(notification.actionHref)
+                        }
+                      }}
+                    >
+                      <div className="flex w-full items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-foreground">{notification.title}</p>
+                        <Badge
+                          variant="outline"
+                          className={
+                            notification.severity === "critical"
+                              ? "border-rose-500/30 text-rose-300"
+                              : notification.severity === "high"
+                                ? "border-orange-500/30 text-orange-300"
+                                : notification.severity === "medium"
+                                  ? "border-amber-500/30 text-amber-300"
+                                  : "border-cyan-500/30 text-cyan-300"
+                          }
+                        >
+                          {notification.module}
+                        </Badge>
+                      </div>
+                      <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{notification.description}</p>
+                      <div className="flex w-full items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{notification.module}</span>
+                        <span>{notification.read ? "read" : "unread"}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-3 py-6 text-sm text-muted-foreground">Şu anda bekleyen bildirim yok.</div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Avatar className="size-6">
+                  <AvatarFallback>{currentUser?.avatarInitials ?? "HC"}</AvatarFallback>
+                </Avatar>
+                <span className="max-w-[140px] truncate">{currentUser?.name ?? "Oturum"}</span>
+                <ChevronDownIcon className="size-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuLabel>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">{currentUser?.name}</p>
+                  <p className="text-xs text-muted-foreground">{currentUser?.role}</p>
+                  <p className="text-xs text-muted-foreground">{currentOrganization.name}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
+                <UserCircle2Icon />
+                Profil ve ayarlar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/verify-2fa")}>
+                <ShieldCheckIcon />
+                Güvenlik doğrulaması
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  logout()
+                  router.replace("/login")
+                }}
+              >
+                <LogOutIcon />
+                Çıkış yap
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

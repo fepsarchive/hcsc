@@ -10,6 +10,7 @@ import {
   FlaskConicalIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
+  LogsIcon,
   NetworkIcon,
   PresentationIcon,
   RadarIcon,
@@ -56,13 +57,14 @@ const workspaceItems = [
 
 const systemItems = [
   { title: "Final Checklist", href: "/final-checklist", icon: ListChecksIcon },
-  { title: "Settings", href: "/final-checklist", icon: Settings2Icon },
+  { title: "Audit Logs", href: "/audit-logs", icon: LogsIcon },
+  { title: "Settings", href: "/settings", icon: Settings2Icon },
   { title: "Documentation", href: "/presentation", icon: BookOpenIcon },
 ] as const
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
-  const { environment, dashboard } = useDemo()
+  const { environment, dashboard, currentOrganization } = useDemo()
   const criticalCount = environment.events.filter((event) => event.severity === "critical").length
   const deceptionCount = environment.deceptions.filter((entry) => entry.status === "triggered").length
 
@@ -82,7 +84,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <ShieldAlertIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Hybrid Cloud Security Console</span>
+                  <span className="truncate font-semibold">{currentOrganization.name}</span>
                   <span className="truncate text-xs text-muted-foreground">Active Defense Prototype</span>
                 </div>
               </Link>
@@ -192,7 +194,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
           <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Prototype</span>
-            <span>v0.1</span>
+            <span>v1.0</span>
           </div>
         </div>
       </SidebarFooter>

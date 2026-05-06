@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useDemo } from "@/components/layout/demo-provider";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
@@ -22,6 +23,7 @@ const reportToneMap = {
 } as const;
 
 export function ReportsView() {
+  const router = useRouter();
   const { environment, generateReport, lastSimulationResult } = useDemo();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = environment.reports.find((report) => report.id === selectedId) ?? null;
@@ -73,10 +75,10 @@ export function ReportsView() {
                   Yeniden üret
                 </ActionButton>
                 <ActionButton variant="ghost" onClick={() => copyText(report.summary)}>
-                  Raporu kopyala
+                  Copy Summary
                 </ActionButton>
                 <ActionButton variant="ghost" onClick={() => copyText(buildReportMarkdown(report, environment))}>
-                  Markdown kopyala
+                  Copy Markdown
                 </ActionButton>
               </div>
             </Panel>
@@ -95,12 +97,12 @@ export function ReportsView() {
           <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
               <ActionButton variant="secondary" onClick={() => copyText(selected.summary)}>
-                Raporu kopyala
+                Copy Summary
               </ActionButton>
               <ActionButton variant="secondary" onClick={() => copyText(buildReportMarkdown(selected, environment))}>
-                Markdown kopyala
+                Copy Markdown
               </ActionButton>
-              <ActionButton onClick={() => window.print()}>Yazdır / PDF</ActionButton>
+              <ActionButton onClick={() => router.push(`/reports/${selected.id}/print`)}>Yazdır / PDF</ActionButton>
             </div>
 
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">

@@ -1,0 +1,84 @@
+import type { AppUser, OrganizationProfile } from "@/types";
+
+export type MockAuthAccount = AppUser & {
+  password: string;
+  twoFactorCode: string;
+};
+
+export const mockOrganization: OrganizationProfile = {
+  id: "org-astrasec",
+  name: "AstraSec Financial Cloud Lab",
+  plan: "Thesis Prototype / Enterprise Simulation",
+  region: "Türkiye / EU",
+  complianceFrameworks: ["KVKK", "GDPR", "ISO 27001", "NIST CSF 2.0"],
+  cloudMode: "Hybrid Cloud",
+  demoMode: true,
+};
+
+export const mockAuthAccounts: MockAuthAccount[] = [
+  {
+    id: "user-security-admin",
+    name: "Aylin Karaca",
+    email: "security.admin@hcsc.local",
+    role: "Security Admin",
+    avatarInitials: "AK",
+    department: "Security Operations",
+    mfaEnabled: true,
+    status: "active",
+    lastLoginAt: "2026-05-05T09:48:00.000Z",
+    password: "demo123",
+    twoFactorCode: "123456",
+  },
+  {
+    id: "user-analyst",
+    name: "Emir Demirtaş",
+    email: "analyst@hcsc.local",
+    role: "Cloud Security Analyst",
+    avatarInitials: "ED",
+    department: "Cloud Security",
+    mfaEnabled: true,
+    status: "active",
+    lastLoginAt: "2026-05-05T08:42:00.000Z",
+    password: "demo123",
+    twoFactorCode: "123456",
+  },
+  {
+    id: "user-compliance",
+    name: "Selin Doğan",
+    email: "compliance@hcsc.local",
+    role: "Compliance Officer",
+    avatarInitials: "SD",
+    department: "Governance",
+    mfaEnabled: true,
+    status: "active",
+    lastLoginAt: "2026-05-05T07:15:00.000Z",
+    password: "demo123",
+    twoFactorCode: "123456",
+  },
+  {
+    id: "user-auditor",
+    name: "Murat Yaman",
+    email: "auditor@hcsc.local",
+    role: "Auditor",
+    avatarInitials: "MY",
+    department: "Internal Audit",
+    mfaEnabled: true,
+    status: "active",
+    lastLoginAt: "2026-05-04T18:24:00.000Z",
+    password: "demo123",
+    twoFactorCode: "123456",
+  },
+  {
+    id: "user-executive",
+    name: "Elif Arslan",
+    email: "executive@hcsc.local",
+    role: "Executive",
+    avatarInitials: "EA",
+    department: "Executive Board",
+    mfaEnabled: true,
+    status: "active",
+    lastLoginAt: "2026-05-04T16:08:00.000Z",
+    password: "demo123",
+    twoFactorCode: "123456",
+  },
+];
