@@ -1,32 +1,195 @@
+import "dotenv/config";
+
 import { createHash } from "node:crypto";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
-  AccessAction,
-  AuditResult,
-  AuditSeverity,
-  CloudLocation,
-  CloudMode,
-  DataClassification,
-  DataTemperature,
-  DeceptionAssetType,
-  DeviceTrust,
-  EventCategory,
-  EventSeverity,
-  EventStatus,
-  IdentityStatus,
-  IdentityType,
-  NotificationType,
   PrismaClient,
-  ReportType,
-  RequestStatus,
-  RiskLevel,
-  SoarAction,
-  StorageType,
-  UserRole,
-  UserStatus,
-  ZeroTrustDecision,
 } from "@prisma/client";
+
+const AccessAction = {
+  read: "read",
+  write: "write",
+  export: "export",
+  delete: "delete",
+  admin: "admin",
+} as const;
+
+const AuditResult = {
+  success: "success",
+  failure: "failure",
+  blocked: "blocked",
+} as const;
+
+const AuditSeverity = {
+  info: "info",
+  warning: "warning",
+  high: "high",
+  critical: "critical",
+} as const;
+
+const CloudLocation = {
+  private_cloud: "private_cloud",
+  public_cloud: "public_cloud",
+  saas: "saas",
+  backup: "backup",
+  deception: "deception",
+} as const;
+
+const CloudMode = {
+  private_cloud: "private_cloud",
+  public_cloud: "public_cloud",
+  hybrid_cloud: "hybrid_cloud",
+} as const;
+
+const DataClassification = {
+  public: "public",
+  internal: "internal",
+  confidential: "confidential",
+  sensitive: "sensitive",
+  critical: "critical",
+} as const;
+
+const DataTemperature = {
+  hot: "hot",
+  warm: "warm",
+  cold: "cold",
+} as const;
+
+const DeceptionAssetType = {
+  bucket: "bucket",
+  database: "database",
+  api: "api",
+  token_store: "token_store",
+  log_archive: "log_archive",
+} as const;
+
+const DeviceTrust = {
+  trusted: "trusted",
+  managed: "managed",
+  unknown: "unknown",
+  compromised: "compromised",
+} as const;
+
+const EventCategory = {
+  unauthorized_access_attempt: "unauthorized_access_attempt",
+  suspicious_export: "suspicious_export",
+  public_bucket_detected: "public_bucket_detected",
+  missing_encryption: "missing_encryption",
+  impossible_travel: "impossible_travel",
+  api_abuse: "api_abuse",
+  deception_triggered: "deception_triggered",
+  ransomware_indicator: "ransomware_indicator",
+  privilege_escalation: "privilege_escalation",
+  policy_violation: "policy_violation",
+  third_party_anomaly: "third_party_anomaly",
+  visibility_gap: "visibility_gap",
+} as const;
+
+const EventSeverity = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+const EventStatus = {
+  open: "open",
+  investigating: "investigating",
+  contained: "contained",
+  resolved: "resolved",
+} as const;
+
+const IdentityStatus = {
+  active: "active",
+  watchlist: "watchlist",
+  suspicious: "suspicious",
+  isolated: "isolated",
+} as const;
+
+const IdentityType = {
+  user: "user",
+  service: "service",
+  third_party: "third_party",
+} as const;
+
+const NotificationType = {
+  critical_event: "critical_event",
+  deception_alarm: "deception_alarm",
+  report_ready: "report_ready",
+  compliance_changed: "compliance_changed",
+  playbook_completed: "playbook_completed",
+  access_request_pending: "access_request_pending",
+  simulation_completed: "simulation_completed",
+} as const;
+
+const ReportType = {
+  general: "general",
+  critical_data: "critical_data",
+  zero_trust: "zero_trust",
+  deception: "deception",
+  nist: "nist",
+  privacy: "privacy",
+  demo: "demo",
+} as const;
+
+const RequestStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+  step_up: "step_up",
+  isolated: "isolated",
+} as const;
+
+const RiskLevel = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+const SoarAction = {
+  account_lock: "account_lock",
+  revoke_token: "revoke_token",
+  require_mfa: "require_mfa",
+  isolate_identity: "isolate_identity",
+  isolate_resource: "isolate_resource",
+  create_ticket: "create_ticket",
+  notify_security_team: "notify_security_team",
+  mark_contained: "mark_contained",
+  mark_resolved: "mark_resolved",
+} as const;
+
+const StorageType = {
+  database: "database",
+  object_storage: "object_storage",
+  file_share: "file_share",
+  saas_export: "saas_export",
+  backup_archive: "backup_archive",
+  deception_storage: "deception_storage",
+} as const;
+
+const UserRole = {
+  security_admin: "security_admin",
+  cloud_security_analyst: "cloud_security_analyst",
+  compliance_officer: "compliance_officer",
+  auditor: "auditor",
+  executive: "executive",
+} as const;
+
+const UserStatus = {
+  active: "active",
+  invited: "invited",
+  suspended: "suspended",
+} as const;
+
+const ZeroTrustDecision = {
+  allow: "allow",
+  limited_allow: "limited_allow",
+  require_step_up_auth: "require_step_up_auth",
+  deny: "deny",
+  isolate: "isolate",
+} as const;
 
 const databaseUrl = process.env.DATABASE_URL;
 
