@@ -1,9 +1,9 @@
 import type { EventStatus, SoarAction } from "@prisma/client";
 
-import { runSoarPlaybook } from "@/lib/event-engine";
 import { prisma } from "@/server/db/prisma";
 import { createAuditLog } from "@/server/services/audit/audit-log-service";
 import { mapSecurityEventRecord } from "@/server/services/core/domain-mappers";
+import { executePlaybookWithEngine, updateEventStatusWithEngine } from "@/server/services/engines/event-engine.service";
 import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
 
 export async function listEvents(
@@ -82,43 +82,35 @@ export async function updateEventStatus(input: {
     return null;
   }
 
-  const updated = await prisma.securityEvent.update({
-    where: { id: event.id },
-    data: {
-      status: input.status,
-      updatedAt: new Date(),
-    },
-    include: {
-      timelineEntries: {
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
-
-  await prisma.eventTimelineEntry.create({
-    data: {
-      eventId: event.id,
-      actor: input.actor.name,
-      message: `Event status ${input.status} olarak güncellendi.`,
-    },
-  });
-
-  await createAuditLog({
+  const updated = await updateEventStatusWithEngine({
     organizationId: input.organizationId,
-    userId: input.actor.userId,
+    eventId: input.eventId,
+    status: input.status,
     actorName: input.actor.name,
-    actorRole: input.actor.role,
-    action: "event_status_updated",
-    module: "Events",
-    target: event.title,
-    severity: event.severity === "critical" ? "critical" : event.severity === "high" ? "high" : "info",
-    result: "success",
-    details: `${event.title} için event status ${input.status} yapıldı.`,
-    ipAddress: input.actor.ipAddress,
-    device: input.actor.userAgent,
   });
 
-  return getEvent(input.organizationId, updated.id);
+  if (!updated?.event) {
+    return null;
+  }
+
+  if (updated.changed) {
+    await createAuditLog({
+      organizationId: input.organizationId,
+      userId: input.actor.userId,
+      actorName: input.actor.name,
+      actorRole: input.actor.role,
+      action: "event_status_updated",
+      module: "Events",
+      target: event.title,
+      severity: event.severity === "critical" ? "critical" : event.severity === "high" ? "high" : "info",
+      result: "success",
+      details: `${event.title} için event status ${input.status} yapıldı.`,
+      ipAddress: input.actor.ipAddress,
+      device: input.actor.userAgent,
+    });
+  }
+
+  return getEvent(input.organizationId, updated.event.id);
 }
 
 export async function executeEventPlaybook(input: {
@@ -138,72 +130,50 @@ export async function executeEventPlaybook(input: {
       id: input.eventId,
       organizationId: input.organizationId,
     },
-    include: {
-      timelineEntries: {
-        orderBy: { createdAt: "desc" },
-      },
-    },
   });
 
   if (!event) {
     return null;
   }
 
-  const updatedView = runSoarPlaybook(mapSecurityEventRecord(event), input.action);
-
-  await prisma.securityEvent.update({
-    where: { id: event.id },
-    data: {
-      status: updatedView.status,
-      recommendation: updatedView.recommendation,
-      updatedAt: new Date(),
-    },
-  });
-
-  await prisma.eventTimelineEntry.create({
-    data: {
-      eventId: event.id,
-      actor: input.actor.name,
-      message: `${input.action} playbook aksiyonu çalıştırıldı.`,
-    },
-  });
-
-  await prisma.playbookExecution.create({
-    data: {
-      organizationId: input.organizationId,
-      eventId: event.id,
-      action: input.action,
-      status: "completed",
-      summary: `${input.action} aksiyonu ${event.title} için başarıyla yürütüldü.`,
-      executedBy: input.actor.name,
-    },
-  });
-
-  await createAuditLog({
+  const result = await executePlaybookWithEngine({
     organizationId: input.organizationId,
-    userId: input.actor.userId,
+    eventId: input.eventId,
+    action: input.action,
     actorName: input.actor.name,
-    actorRole: input.actor.role,
-    action: "playbook_executed",
-    module: "Events",
-    target: event.title,
-    severity: event.severity === "critical" ? "critical" : event.severity === "high" ? "high" : "info",
-    result: "success",
-    details: `${input.action} playbook aksiyonu çalıştırıldı.`,
-    ipAddress: input.actor.ipAddress,
-    device: input.actor.userAgent,
   });
 
-  await notifyOrganizationMembers({
-    organizationId: input.organizationId,
-    title: "Playbook completed",
-    description: `${event.title} için ${input.action} aksiyonu tamamlandı.`,
-    type: "playbook_completed",
-    severity: event.severity,
-    module: "Events",
-    actionHref: "/events",
-    roles: ["security_admin", "cloud_security_analyst"],
-  });
+  if (!result) {
+    return null;
+  }
+
+  if (result.executionCreated) {
+    await createAuditLog({
+      organizationId: input.organizationId,
+      userId: input.actor.userId,
+      actorName: input.actor.name,
+      actorRole: input.actor.role,
+      action: "playbook_executed",
+      module: "Events",
+      target: event.title,
+      severity: event.severity === "critical" ? "critical" : event.severity === "high" ? "high" : "info",
+      result: "success",
+      details: `${input.action} playbook aksiyonu çalıştırıldı.`,
+      ipAddress: input.actor.ipAddress,
+      device: input.actor.userAgent,
+    });
+
+    await notifyOrganizationMembers({
+      organizationId: input.organizationId,
+      title: "Playbook completed",
+      description: `${event.title} için ${input.action} aksiyonu tamamlandı.`,
+      type: "playbook_completed",
+      severity: event.severity,
+      module: "Events",
+      actionHref: "/events",
+      roles: ["security_admin", "cloud_security_analyst"],
+    });
+  }
 
   return getEvent(input.organizationId, event.id);
 }

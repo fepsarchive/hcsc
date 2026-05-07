@@ -1,7 +1,7 @@
-import { calculateAssetRisk } from "@/lib/risk-engine";
 import { prisma } from "@/server/db/prisma";
 import { createAuditLog } from "@/server/services/audit/audit-log-service";
-import { mapAssetRecord, mapSecurityEventRecord } from "@/server/services/core/domain-mappers";
+import { mapAssetRecord } from "@/server/services/core/domain-mappers";
+import { recalculateAssetRiskWithEngine } from "@/server/services/engines/risk-engine.service";
 import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
 
 export async function listAssets(
@@ -63,44 +63,14 @@ export async function recalculateAssetRisk(input: {
     userAgent?: string | null;
   };
 }) {
-  const asset = await prisma.asset.findFirst({
-    where: {
-      id: input.assetId,
-      organizationId: input.organizationId,
-    },
+  const recalculated = await recalculateAssetRiskWithEngine({
+    organizationId: input.organizationId,
+    assetId: input.assetId,
   });
 
-  if (!asset) {
+  if (!recalculated) {
     return null;
   }
-
-  const relatedEvents = await prisma.securityEvent.findMany({
-    where: {
-      organizationId: input.organizationId,
-      OR: [{ relatedAssetId: asset.id }, { target: { contains: asset.name, mode: "insensitive" } }],
-    },
-    include: {
-      timelineEntries: {
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
-
-  const calculated = calculateAssetRisk(
-    mapAssetRecord(asset),
-    relatedEvents.map(mapSecurityEventRecord),
-  );
-
-  const updated = await prisma.asset.update({
-    where: { id: asset.id },
-    data: {
-      riskScore: calculated.score,
-      riskLevel: calculated.level,
-      riskReasons: calculated.reasons,
-      recommendedControls: calculated.recommendedControls,
-      updatedAt: new Date(),
-    },
-  });
 
   await createAuditLog({
     organizationId: input.organizationId,
@@ -109,26 +79,30 @@ export async function recalculateAssetRisk(input: {
     actorRole: input.actor.role,
     action: "asset_risk_recalculated",
     module: "Assets",
-    target: updated.name,
+    target: recalculated.asset.name,
     severity: "info",
     result: "success",
-    details: `${updated.name} için risk skoru ${calculated.score}/${calculated.level} olarak güncellendi.`,
+    details: `${recalculated.asset.name} için risk skoru ${recalculated.asset.riskScore}/${recalculated.asset.riskLevel} olarak güncellendi.`,
     ipAddress: input.actor.ipAddress,
     device: input.actor.userAgent,
+    metadata: {
+      openCriticalEventCount: recalculated.metrics.openCriticalEventCount,
+      deceptionTriggerCount: recalculated.metrics.deceptionTriggerCount,
+    },
   });
 
-  if (calculated.level === "high" || calculated.level === "critical") {
+  if (recalculated.asset.riskLevel === "high" || recalculated.asset.riskLevel === "critical") {
     await notifyOrganizationMembers({
       organizationId: input.organizationId,
       title: "High risk asset detected",
-      description: `${updated.name} varlığı ${calculated.level} risk seviyesine yükseldi.`,
+      description: `${recalculated.asset.name} varlığı ${recalculated.asset.riskLevel} risk seviyesine yükseldi.`,
       type: "critical_event",
-      severity: calculated.level === "critical" ? "critical" : "high",
+      severity: recalculated.asset.riskLevel === "critical" ? "critical" : "high",
       module: "Assets",
       actionHref: "/assets",
       roles: ["security_admin", "cloud_security_analyst"],
     });
   }
 
-  return mapAssetRecord(updated);
+  return mapAssetRecord(recalculated.asset);
 }

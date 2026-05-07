@@ -1,11 +1,11 @@
 import type { DeceptionAssetType, EventSeverity } from "@prisma/client";
 
-import { triggerDeceptionAccess } from "@/lib/deception-engine";
 import { prisma } from "@/server/db/prisma";
 import { createAuditLog } from "@/server/services/audit/audit-log-service";
 import { mapDeceptionTriggerRecord } from "@/server/services/core/extra-mappers";
-import { mapDeceptionAssetRecord as mapDeceptionAsset, mapIdentityRecord, mapSecurityEventRecord } from "@/server/services/core/domain-mappers";
-import { createNotification, notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
+import { mapDeceptionAssetRecord as mapDeceptionAsset } from "@/server/services/core/domain-mappers";
+import { simulateDeceptionAccessWithEngine } from "@/server/services/engines/deception-engine.service";
+import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
 
 export async function listDeceptionAssets(organizationId: string) {
   const assets = await prisma.deceptionAsset.findMany({
@@ -93,103 +93,18 @@ export async function simulateDeceptionAccess(input: {
     userAgent?: string | null;
   };
 }) {
-  const deceptionAsset = await prisma.deceptionAsset.findFirst({
-    where: {
-      id: input.deceptionAssetId,
-      organizationId: input.organizationId,
-    },
+  const result = await simulateDeceptionAccessWithEngine({
+    organizationId: input.organizationId,
+    deceptionAssetId: input.deceptionAssetId,
+    identityProfileId: input.identityProfileId,
+    sourceIp: input.actor.ipAddress,
+    userAgent: input.actor.userAgent,
+    requestPath: `/api/deception-assets/${input.deceptionAssetId}/simulate-access`,
   });
 
-  if (!deceptionAsset) {
+  if (!result) {
     return null;
   }
-
-  const identity =
-    (input.identityProfileId
-      ? await prisma.identityProfile.findFirst({
-          where: {
-            id: input.identityProfileId,
-            organizationId: input.organizationId,
-          },
-        })
-      : null) ??
-    (await prisma.identityProfile.findFirst({
-      where: { organizationId: input.organizationId },
-      orderBy: [{ anomalyScore: "desc" }, { riskScore: "desc" }],
-    }));
-
-  if (!identity) {
-    return null;
-  }
-
-  const simulated = triggerDeceptionAccess(
-    mapDeceptionAsset(deceptionAsset),
-    mapIdentityRecord(identity),
-  );
-
-  await prisma.identityProfile.update({
-    where: { id: identity.id },
-    data: {
-      anomalyScore: simulated.updatedIdentity.anomalyScore,
-      riskScore: simulated.updatedIdentity.riskScore,
-      status: simulated.updatedIdentity.status,
-      notes: simulated.updatedIdentity.notes,
-      updatedAt: new Date(),
-    },
-  });
-
-  const updatedDeception = await prisma.deceptionAsset.update({
-    where: { id: deceptionAsset.id },
-    data: {
-      lureScore: simulated.updatedDeception.lureScore,
-      triggerCount: simulated.updatedDeception.triggerCount,
-      lastTriggeredAt: simulated.updatedDeception.lastTriggeredAt
-        ? new Date(simulated.updatedDeception.lastTriggeredAt)
-        : new Date(),
-      status: "triggered",
-      updatedAt: new Date(),
-    },
-  });
-
-  const event = await prisma.securityEvent.create({
-    data: {
-      organizationId: input.organizationId,
-      title: simulated.event.title,
-      severity: simulated.event.severity,
-      category: simulated.event.category,
-      source: simulated.event.source,
-      target: simulated.event.target,
-      description: simulated.event.description,
-      relatedControl: simulated.event.relatedControl,
-      recommendation: simulated.event.recommendation,
-      status: simulated.event.status,
-      evidence: simulated.event.evidence,
-      playbookActions: simulated.event.playbookActions,
-      relatedIdentityId: identity.id,
-      relatedDeceptionAssetId: deceptionAsset.id,
-    },
-  });
-
-  await prisma.eventTimelineEntry.createMany({
-    data: simulated.event.timeline.map((entry) => ({
-      eventId: event.id,
-      actor: entry.actor,
-      message: entry.message,
-    })),
-  });
-
-  await prisma.deceptionTrigger.create({
-    data: {
-      organizationId: input.organizationId,
-      deceptionAssetId: deceptionAsset.id,
-      identityProfileId: identity.id,
-      eventId: event.id,
-      sourceIp: input.actor.ipAddress,
-      userAgent: input.actor.userAgent,
-      requestHeaders: { simulated: true },
-      requestPath: `/api/deception-assets/${deceptionAsset.id}/simulate-access`,
-    },
-  });
 
   await createAuditLog({
     organizationId: input.organizationId,
@@ -198,28 +113,23 @@ export async function simulateDeceptionAccess(input: {
     actorRole: input.actor.role,
     action: "deception_triggered",
     module: "Deception",
-    target: deceptionAsset.name,
+    target: result.deceptionAsset.name,
     severity: "critical",
     result: "success",
-    details: `${identity.name} için güvenli deception simülasyonu çalıştırıldı.`,
+    details: `${result.deceptionAsset.name} için güvenli deception simülasyonu çalıştırıldı.`,
     ipAddress: input.actor.ipAddress,
     device: input.actor.userAgent,
-  });
-
-  await createNotification({
-    organizationId: input.organizationId,
-    title: "Deception triggered",
-    description: simulated.recommendation.summary,
-    type: "deception_alarm",
-    severity: "critical",
-    module: "Deception",
-    actionHref: "/deception",
+    metadata: {
+      triggerId: result.triggerId,
+      recommendation: result.recommendation.actions,
+      identityStatus: result.identityStatus,
+    },
   });
 
   await notifyOrganizationMembers({
     organizationId: input.organizationId,
     title: "Critical deception event",
-    description: simulated.recommendation.summary,
+    description: result.recommendation.summary,
     type: "deception_alarm",
     severity: "critical",
     module: "Deception",
@@ -228,16 +138,7 @@ export async function simulateDeceptionAccess(input: {
   });
 
   return {
-    deceptionAsset: mapDeceptionAsset(updatedDeception),
-    event: await prisma.securityEvent
-      .findUnique({
-        where: { id: event.id },
-        include: {
-          timelineEntries: {
-            orderBy: { createdAt: "desc" },
-          },
-        },
-      })
-      .then((entry) => (entry ? mapSecurityEventRecord(entry) : null)),
+    deceptionAsset: result.deceptionAsset,
+    event: result.event,
   };
 }

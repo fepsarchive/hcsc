@@ -8,7 +8,23 @@ import { generateOrganizationReport } from "@/server/services/reports/reports-se
 
 const bodySchema = z.object({
   type: z
-    .enum(["general", "critical-data", "critical_data", "zero-trust", "zero_trust", "deception", "nist", "privacy", "demo"])
+    .enum([
+      "general",
+      "critical-data",
+      "critical_data",
+      "zero-trust",
+      "zero_trust",
+      "deception",
+      "nist",
+      "privacy",
+      "demo",
+      "executive_demo",
+      "deception_incident",
+      "zero_trust_decision",
+      "compliance_summary",
+      "security_posture",
+      "incident_response",
+    ])
     .optional(),
 });
 
