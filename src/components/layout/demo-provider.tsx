@@ -8,7 +8,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const hydrateAuthSession = useSecurityConsoleStore((state) => state.hydrateAuthSession);
 
   useEffect(() => {
-    hydrateAuthSession();
+    void hydrateAuthSession();
   }, [hydrateAuthSession]);
 
   return <>{children}</>;

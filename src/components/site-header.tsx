@@ -319,8 +319,9 @@ export function SiteHeader() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {
-                  logout()
-                  router.replace("/login")
+                  void logout().finally(() => {
+                    router.replace("/login")
+                  })
                 }}
               >
                 <LogOutIcon />

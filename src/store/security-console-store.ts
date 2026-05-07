@@ -78,6 +78,7 @@ type StoreMeta = {
   lastSimulationResult: SimulationRunResult | null;
   toasts: ToastMessage[];
   auth: AuthState;
+  currentUser: AppUser | null;
   organization: OrganizationProfile;
   onboardingCompleted: boolean;
   auditLogs: AuditLogItem[];
@@ -134,10 +135,10 @@ export type SecurityConsoleStore = {
   previousDemoStep: () => void;
   dismissToast: (toastId: string) => void;
   runRiskAnalysis: (assetId?: string) => void;
-  hydrateAuthSession: () => void;
-  login: (email: string, password: string) => AuthActionResult;
-  verify2FA: (code: string) => AuthActionResult;
-  logout: () => void;
+  hydrateAuthSession: () => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthActionResult>;
+  verify2FA: (code: string) => Promise<AuthActionResult>;
+  logout: () => Promise<void>;
   completeOnboarding: (payload: OnboardingPayload) => void;
   can: (permission: Permission) => boolean;
   addAuditLog: (payload: CreateAuditLogPayload) => void;
@@ -176,6 +177,7 @@ function createInitialMeta(): StoreMeta {
       sessionStartedAt: null,
       lastLoginAt: null,
     },
+    currentUser: null,
     organization: mockOrganization,
     onboardingCompleted: false,
     auditLogs: [],
@@ -190,6 +192,7 @@ function persistAuthMeta(meta: StoreMeta) {
     AUTH_SESSION_KEY,
     JSON.stringify({
       auth: meta.auth,
+      currentUser: meta.currentUser,
       onboardingCompleted: meta.onboardingCompleted,
       organization: meta.organization,
       auditLogs: meta.auditLogs.slice(0, 100),
@@ -205,14 +208,77 @@ function readPersistedAuthMeta() {
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as Pick<StoreMeta, "auth" | "onboardingCompleted" | "organization" | "auditLogs" | "notifications">;
+    return JSON.parse(raw) as Pick<StoreMeta, "auth" | "currentUser" | "onboardingCompleted" | "organization" | "auditLogs" | "notifications">;
   } catch {
     return null;
   }
 }
 
+type AuthApiPayload = {
+  authenticated: boolean;
+  twoFactorVerified: boolean;
+  sessionStartedAt: string | null;
+  user: AppUser | null;
+  organization: OrganizationProfile | null;
+  onboardingCompleted: boolean;
+  permissions?: Permission[];
+};
+
+async function parseAuthApiResponse(response: Response) {
+  const payload = (await response.json().catch(() => null)) as
+    | { data?: AuthApiPayload | null; error?: { message?: string } | null }
+    | null;
+
+  if (!response.ok) {
+    return {
+      success: false as const,
+      error:
+        payload?.error?.message ??
+        "Kimlik doğrulama isteği tamamlanamadı.",
+    };
+  }
+
+  return {
+    success: true as const,
+    data: payload?.data ?? null,
+  };
+}
+
+function applyServerAuthPayload(data: AuthApiPayload | null) {
+  if (!data || !data.authenticated || !data.user || !data.organization) {
+    setMeta({
+      auth: {
+        hydrated: true,
+        isAuthenticated: false,
+        is2FAVerified: false,
+        currentUserId: null,
+        sessionStartedAt: null,
+        lastLoginAt: null,
+      },
+      currentUser: null,
+      organization: mockOrganization,
+      onboardingCompleted: false,
+    });
+    return;
+  }
+
+  setMeta({
+    auth: {
+      hydrated: true,
+      isAuthenticated: data.authenticated,
+      is2FAVerified: data.twoFactorVerified,
+      currentUserId: data.user.id,
+      sessionStartedAt: data.sessionStartedAt,
+      lastLoginAt: data.user.lastLoginAt,
+    },
+    currentUser: data.user,
+    organization: data.organization,
+    onboardingCompleted: data.onboardingCompleted,
+  });
+}
+
 function getCurrentActor() {
-  const currentUser = mockAuthAccounts.find((account) => account.id === currentMeta.auth.currentUserId);
+  const currentUser = currentMeta.currentUser;
 
   return {
     actorId: currentUser?.id ?? null,
@@ -369,8 +435,6 @@ function buildSnapshot(environment: DemoEnvironment, meta: StoreMeta): Omit<
   | "markNotificationRead"
   | "clearNotifications"
 > {
-  const currentUser = mockAuthAccounts.find((account) => account.id === meta.auth.currentUserId) ?? null;
-
   return {
     environment,
     dashboard: buildDashboardSummary(environment),
@@ -392,7 +456,7 @@ function buildSnapshot(environment: DemoEnvironment, meta: StoreMeta): Omit<
     lastSimulationResult: meta.lastSimulationResult,
     toasts: meta.toasts,
     auth: meta.auth,
-    currentUser,
+    currentUser: meta.currentUser,
     currentOrganization: meta.organization,
     onboardingCompleted: meta.onboardingCompleted,
     auditLogs: meta.auditLogs,
@@ -1315,8 +1379,25 @@ const actions: Pick<
     actions.recalculateAllRisks();
   },
 
-  hydrateAuthSession() {
+  async hydrateAuthSession() {
     if (currentMeta.auth.hydrated) return;
+
+    try {
+      const response = await fetch("/api/auth/me", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      const result = await parseAuthApiResponse(response);
+
+      if (result.success) {
+        applyServerAuthPayload(result.data);
+        return;
+      }
+    } catch {
+      // Network or server failure falls back to persisted mock/session state.
+    }
+
     const persisted = readPersistedAuthMeta();
 
     if (!persisted) {
@@ -1334,12 +1415,13 @@ const actions: Pick<
         ...persisted.auth,
         hydrated: true,
       },
+      currentUser: persisted.currentUser ?? null,
       onboardingCompleted: persisted.onboardingCompleted,
       organization: persisted.organization ?? currentMeta.organization,
     });
   },
 
-  login(email, password) {
+  async login(email, password) {
     pushAuditLog({
       action: "login_attempt",
       module: "Authentication",
@@ -1351,6 +1433,69 @@ const actions: Pick<
       actorRole: "Anonymous",
       actorId: null,
     });
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+      const result = await parseAuthApiResponse(response);
+
+      if (result.success && result.data) {
+        applyServerAuthPayload(result.data);
+        pushToast({
+          title: "Kimlik doğrulandı",
+          description: "İkinci faktör kodunu doğrulayarak oturumu tamamlayın.",
+          tone: "policy",
+        });
+        pushAuditLog({
+          action: "login_success",
+          module: "Authentication",
+          target: result.data.user?.email ?? email,
+          severity: "info",
+          result: "success",
+          details: "Kullanıcı parolayla doğrulandı, 2FA bekleniyor.",
+          actorName: result.data.user?.name ?? email,
+          actorRole: result.data.user?.role ?? "Anonymous",
+          actorId: result.data.user?.id ?? null,
+        });
+
+        return { success: true };
+      }
+
+      if (!result.success) {
+        pushToast({
+          title: "Giriş başarısız",
+          description: result.error ?? "E-posta veya parola doğrulanamadı.",
+          tone: "warning",
+        });
+        pushAuditLog({
+          action: "login_failed",
+          module: "Authentication",
+          target: email,
+          severity: "warning",
+          result: "failure",
+          details: result.error ?? "E-posta veya parola doğrulanamadı.",
+          actorName: email,
+          actorRole: "Anonymous",
+          actorId: null,
+        });
+        return {
+          success: false,
+          error: result.error ?? "E-posta veya parola hatalı.",
+        };
+      }
+    } catch {
+      // Fall back to existing mock flow if the API is unavailable.
+    }
+
     const account = mockAuthAccounts.find(
       (entry) => entry.email.toLowerCase() === email.trim().toLowerCase() && entry.password === password,
     );
@@ -1388,6 +1533,7 @@ const actions: Pick<
         sessionStartedAt: null,
         lastLoginAt: now,
       },
+      currentUser: account,
     });
 
     pushToast({
@@ -1412,8 +1558,62 @@ const actions: Pick<
     };
   },
 
-  verify2FA(code) {
-    const currentUser = mockAuthAccounts.find((entry) => entry.id === currentMeta.auth.currentUserId);
+  async verify2FA(code) {
+    if (currentMeta.auth.isAuthenticated) {
+      try {
+        const response = await fetch("/api/auth/verify-2fa", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ code }),
+        });
+        const result = await parseAuthApiResponse(response);
+
+        if (result.success && result.data) {
+          applyServerAuthPayload(result.data);
+          pushToast({
+            title: "Güvenli oturum açıldı",
+            description: "Zero Trust ve aktif savunma konsolu kullanıma hazır.",
+            tone: "success",
+          });
+          pushAuditLog({
+            action: "two_factor_verified",
+            module: "Authentication",
+            target: result.data.user?.email ?? "session",
+            severity: "info",
+            result: "success",
+            details: "2FA doğrulaması tamamlandı.",
+          });
+          return { success: true };
+        }
+
+        if (!result.success) {
+          pushToast({
+            title: "2FA doğrulanamadı",
+            description: result.error ?? "Demo kodu 123456 ile eşleşen 6 haneli kod bekleniyor.",
+            tone: "warning",
+          });
+          pushAuditLog({
+            action: "two_factor_failed",
+            module: "Authentication",
+            target: currentMeta.currentUser?.email ?? "session",
+            severity: "warning",
+            result: "failure",
+            details: result.error ?? "Geçersiz 2FA kodu girildi.",
+          });
+          return {
+            success: false,
+            error: result.error ?? "Doğrulama kodu hatalı.",
+          };
+        }
+      } catch {
+        // Fall back to existing mock flow if the API is unavailable.
+      }
+    }
+
+    const currentUser = currentMeta.currentUser ?? mockAuthAccounts.find((entry) => entry.id === currentMeta.auth.currentUserId);
     if (!currentUser) {
       return {
         success: false,
@@ -1421,7 +1621,7 @@ const actions: Pick<
       };
     }
 
-    if (code.trim() !== currentUser.twoFactorCode) {
+    if (code.trim() !== "123456") {
       pushToast({
         title: "2FA doğrulanamadı",
         description: "Demo kodu 123456 ile eşleşen 6 haneli kod bekleniyor.",
@@ -1451,6 +1651,10 @@ const actions: Pick<
         sessionStartedAt: now,
         lastLoginAt: now,
       },
+      currentUser: {
+        ...currentUser,
+        lastLoginAt: now,
+      },
     });
 
     pushToast({
@@ -1472,7 +1676,16 @@ const actions: Pick<
     };
   },
 
-  logout() {
+  async logout() {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // Keep local logout functional even if the server is unavailable.
+    }
+
     if (typeof window !== "undefined") {
       window.sessionStorage.removeItem(AUTH_SESSION_KEY);
     }
@@ -1486,6 +1699,7 @@ const actions: Pick<
         sessionStartedAt: null,
         lastLoginAt: null,
       },
+      currentUser: null,
       onboardingCompleted: false,
     });
 
@@ -1542,8 +1756,7 @@ const actions: Pick<
   },
 
   can(permission) {
-    const currentUser = mockAuthAccounts.find((entry) => entry.id === currentMeta.auth.currentUserId);
-    return hasPermission(currentUser?.role, permission);
+    return hasPermission(currentMeta.currentUser?.role, permission);
   },
 
   addAuditLog(payload) {

@@ -16,9 +16,9 @@ export default function VerifyTwoFactorPage() {
   const [error, setError] = useState<string | null>(null);
   const maskedEmail = useMemo(() => currentUser?.email ?? "security.admin@hcsc.local", [currentUser?.email]);
 
-  const handleVerify = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleVerify = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const result = verify2FA(code);
+    const result = await verify2FA(code);
 
     if (!result.success) {
       setError(result.error ?? "Kod doğrulanamadı.");

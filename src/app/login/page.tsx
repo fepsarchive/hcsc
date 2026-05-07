@@ -18,9 +18,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("demo123");
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const result = login(email, password);
+    const result = await login(email, password);
 
     if (!result.success) {
       setError(result.error ?? "Giriş başarısız.");
