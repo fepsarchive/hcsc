@@ -1,35 +1,58 @@
-# HCSC v1.0
+# HCSC v2 Foundation
 
-Hybrid Cloud Security Console (HCSC), **“Hibrit Bulut Ortamında Veri Depolama ve Yönetimi İçin Aktif Savunma Tabanlı Güvenlik Mimarisi Tasarımı”** başlıklı bitirme tezinin uygulama/prototip çözümüdür.
+Hybrid Cloud Security Console (HCSC), **“Hibrit Bulut Ortamında Veri Depolama ve Yönetimi İçin Aktif Savunma Tabanlı Güvenlik Mimarisi Tasarımı”** başlıklı bitirme tezinin ürünleşebilir SaaS foundation sürümüdür.
 
-Uygulama; veri varlıklarını sınıflandıran, Zero Trust erişim kararları üreten, deception tabanlı aktif savunma senaryolarını güvenli simülasyon olarak çalıştıran, SIEM/SOAR olay görünürlüğü sağlayan ve NIST CSF 2.0 ile KVKK/GDPR uyumluluk etkilerini raporlayan bir güvenlik konsolu olarak tasarlanmıştır.
+HCSC v2 foundation:
 
-## V1.0 modülleri
+- Prisma + Neon/PostgreSQL kalıcı veri katmanı
+- DB-backed auth / session / 2FA
+- organization-scoped API katmanı
+- backend risk / Zero Trust / deception / compliance / report engine’leri
+- API-first frontend store hydration
+- güvenli deception trap endpoint
+- DB snapshot tabanlı report print flow
 
-- Login ve 2FA doğrulama
-- Protected routes ve rol tabanlı görünürlük
-- Dashboard
-- Data Assets
-- Access Requests
-- Policy Engine
-- Deception / Sahte veritabanı senaryosu
-- Events / SIEM-SOAR
-- Compliance
-- Threat Matrix
-- Reports
-- Professional print report template
-- Simulations
-- Presentation Mode
-- Audit Logs
-- Notification Center
-- Settings
-- Onboarding
-- Final Checklist
+## Local kurulum
+
+1. `.env.example` dosyasını `.env` olarak kopyala.
+2. PostgreSQL veya Neon bağlantısını `DATABASE_URL` ve `DIRECT_URL` alanlarına gir.
+3. Bağımlılıkları yükle:
+
+```bash
+npm install
+```
+
+4. Prisma Client üret:
+
+```bash
+npm run prisma:generate
+```
+
+5. Migration uygula:
+
+```bash
+npx prisma migrate dev --name init
+```
+
+6. Demo veriyi yükle:
+
+```bash
+npm run db:seed
+```
+
+7. Geliştirme sunucusunu başlat:
+
+```bash
+npm run dev
+```
 
 ## Demo kullanıcılar
 
 - `security.admin@hcsc.local`
 - `analyst@hcsc.local`
+- `compliance@hcsc.local`
+- `auditor@hcsc.local`
+- `executive@hcsc.local`
 
 Parola:
 
@@ -43,69 +66,67 @@ demo123
 123456
 ```
 
-## Executive demo nasıl çalıştırılır?
+## API-first mimari
 
-1. `/login` ekranında bir demo kullanıcı seç.
-2. Parola olarak `demo123` gir.
-3. `/verify-2fa` ekranında `123456` kodunu doğrula.
-4. Gerekirse onboarding’i tamamla.
-5. Dashboard veya Simulations ekranında `Demo Senaryosu Başlat` aksiyonunu çalıştır.
-6. Akış şu modüllere yansır:
-   - Access Requests
-   - Events / SIEM-SOAR
-   - Deception
-   - Compliance
-   - Reports
-   - Presentation Mode
-   - Audit Logs
-   - Notification Center
+Frontend store korunur, ancak primary source backend API’dir.
 
-## Fake database deception nasıl test edilir?
+- API başarılıysa state DB’den hydrate olur
+- API başarısızsa kontrollü mock fallback korunur
+- organization scope client değil backend session context ile çözülür
 
-`/deception` sayfasındaki **Sahte Veritabanı Tuzak Senaryosu** kartını kullan.
+## Backend engine’ler
 
-Senaryo:
+- Risk Engine: asset risk skorunu policy + event + deception sinyaline göre hesaplar
+- Zero Trust Engine: access request kararını server-side üretir
+- Deception Engine: güvenli deception simülasyonu ve trap olaylarını üretir
+- Event / SOAR Engine: playbook, timeline, containment ve audit akışını yönetir
+- Compliance Engine: NIST CSF 2.0 / KVKK / GDPR / ISO 27001 görünümünü hesaplar
+- Report Engine: kalıcı snapshot tabanlı rapor üretir
 
-- Sahte veritabanı: `legacy-customer-db-shadow`
-- Şüpheli kimlik: `legacy-api-token`
-- Olay: `deception_triggered`
-- Severity: `critical`
-- Önerilen aksiyonlar:
-  - `isolate_identity`
-  - `revoke_token`
-  - `create_ticket`
-  - `notify_security_team`
+## Executive demo
 
-Bu akış gerçek veri içermez ve yalnızca güvenli simülasyon olarak çalışır.
+`/dashboard` veya `/simulations` üzerinden **Demo Senaryosu Başlat** aksiyonu çalıştırıldığında:
 
-## Print report nasıl alınır?
+1. access request oluşturulur
+2. Zero Trust kararı üretilir
+3. deception alarmı üretilir
+4. compliance yeniden hesaplanır
+5. report oluşturulur
+6. audit log ve notification kayıtları güncellenir
 
-1. `/reports` sayfasına git.
-2. Bir rapor kartından `Print Report` seç.
-3. `/reports/[id]/print` sayfası açılır.
-4. Yazdır butonuyla `window.print()` çağrılır ve print audit log’u oluşur.
+## Trap endpoint etik sınırı
 
-## Nasıl çalıştırılır?
+`/api/trap/[trapSlug]` endpoint’i:
 
-```bash
-npm install
-npm run dev
-```
+- gerçek veri döndürmez
+- gerçek backend kaynağına proxy olmaz
+- exploit çalıştırmaz
+- hack-back yapmaz
+- saldırgana saldırmaz
 
-Varsayılan adres:
+Yalnızca güvenli deception logging, erken uyarı, audit ve notification üretir.
 
-[http://localhost:3000](http://localhost:3000)
+## Report print flow
 
-Port doluysa Next.js uygun başka bir port seçebilir.
+- `/reports/[id]/print` sayfası DB snapshot üzerinden yüklenir
+- `/api/reports/[id]/print-payload` normalize edilmiş print payload döner
+- `/api/reports/[id]/print` yazdırma aksiyonunu audit log’a işler
 
-## Build komutları
+## Build ve kalite kontrolleri
 
 ```bash
 npm run lint
 npm run build
 ```
 
-## Güvenlik ve etik sınırlar
+## Deployment notu
+
+Vercel deploy için Prisma Client generate zinciri önemlidir.
+
+- `postinstall` veya build öncesi `prisma generate` çalışmalıdır
+- final production cleanup ve deploy doğrulaması foundation sonrası ayrıca yapılacaktır
+
+## Güvenlik ve etik not
 
 Bu uygulama:
 
@@ -113,29 +134,6 @@ Bu uygulama:
 - exploit çalıştırmaz
 - malware veya ransomware içermez
 - saldırgana saldırmaz
-- hack-back yapmaz
-- gerçek veri kullanmaz
+- aktif karşı saldırı yürütmez
 
-Deception kaynakları:
-
-- sahte database
-- sahte bucket/storage
-- sahte API endpoint
-- sahte token store
-- sahte log archive
-
-ve yalnızca **erken tespit, loglama, alarm, izolasyon önerisi ve raporlama** amacıyla güvenli simülasyon olarak çalışır.
-
-## Akademik dayanaklar
-
-- NIST Cybersecurity Framework 2.0
-- NIST Zero Trust Architecture
-- MITRE Engage
-- OWASP API Security
-- KVKK / GDPR
-
-## Notlar
-
-- Arayüz shadcn/ui `dashboard-01` tasarım dili üzerine kuruludur.
-- Veri katmanı local mock state ve merkezi store ile çalışır.
-- Mimari ileride API ve veritabanı katmanına bağlanabilecek şekilde modüler tutulmuştur.
+Deception katmanı yalnızca güvenli gözlem, alarm, izolasyon önerisi ve raporlama amacıyla tasarlanmıştır.

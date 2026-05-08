@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useDemo } from "@/components/layout/demo-provider";
+import { toast } from "sonner";
+
+import { getReportPrintPayload, printReport, type ReportPrintPayload } from "@/lib/hcsc-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
 
 const reportToneMap = {
   general: "info",
-  "critical-data": "critical",
-  "zero-trust": "policy",
+  critical_data: "critical",
+  zero_trust: "policy",
   deception: "deception",
   nist: "compliance",
   privacy: "info",
@@ -19,24 +21,124 @@ const reportToneMap = {
 
 export function ReportPrintView({ reportId }: { reportId: string }) {
   const router = useRouter();
-  const { reports, environment, currentOrganization, currentUser, dashboard, complianceScores, addAuditLog } = useDemo();
-  const report = reports.find((entry) => entry.id === reportId) ?? null;
+  const [payload, setPayload] = useState<ReportPrintPayload | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const relatedEvents = useMemo(
-    () => environment.events.filter((event) => report?.relatedEventIds.includes(event.id)).slice(0, 3),
-    [environment.events, report],
-  );
-  const relatedAssets = useMemo(
-    () => environment.assets.filter((asset) => report?.relatedAssetIds?.includes(asset.id)).slice(0, 3),
-    [environment.assets, report],
+  const loadPayload = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const nextPayload = await getReportPrintPayload(reportId);
+      setPayload(nextPayload);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "Print payload alınamadı.";
+      setError(message);
+      setPayload(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrate = async () => {
+      try {
+        const nextPayload = await getReportPrintPayload(reportId);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setPayload(nextPayload);
+        setError(null);
+      } catch (loadError) {
+        if (!isMounted) {
+          return;
+        }
+
+        const message = loadError instanceof Error ? loadError.message : "Print payload alınamadı.";
+        setError(message);
+        setPayload(null);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void hydrate();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [reportId]);
+
+  const reportTypeTone = payload
+    ? reportToneMap[payload.report.type as keyof typeof reportToneMap] ?? "info"
+    : "info";
+
+  const criticalEventCount = useMemo(
+    () => payload?.eventTimeline.filter((event) => event.severity === "critical").length ?? 0,
+    [payload],
   );
 
-  if (!report) {
+  const handlePrint = async () => {
+    if (!payload) {
+      return;
+    }
+
+    setIsPrinting(true);
+
+    try {
+      await printReport(reportId);
+      toast.success("Print audit kaydı oluşturuldu.");
+      window.print();
+    } catch (printError) {
+      const message = printError instanceof Error ? printError.message : "Print kaydı oluşturulamadı.";
+      toast.error(message);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <main className="min-h-svh bg-white px-6 py-10 text-slate-900">
+        <div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <h1 className="text-2xl font-semibold">Print payload hazırlanıyor</h1>
+          <p className="mt-3 text-sm text-slate-600">Rapor snapshot ve branding bilgileri veritabanından okunuyor.</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-svh bg-white px-6 py-10 text-slate-900">
+        <div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <h1 className="text-2xl font-semibold">Print görünümü yüklenemedi</h1>
+          <p className="mt-3 text-sm text-slate-600">{error}</p>
+          <div className="mt-6 flex gap-2">
+            <Button variant="outline" onClick={() => router.push("/reports")}>
+              Reports sayfasına dön
+            </Button>
+            <Button onClick={() => void loadPayload()}>Tekrar dene</Button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!payload) {
     return (
       <main className="min-h-svh bg-white px-6 py-10 text-slate-900">
         <div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
           <h1 className="text-2xl font-semibold">Rapor bulunamadı</h1>
-          <p className="mt-3 text-sm text-slate-600">İstenen rapor mevcut state içinde bulunamadı.</p>
+          <p className="mt-3 text-sm text-slate-600">İstenen rapor için veritabanında yazdırılabilir snapshot bulunamadı.</p>
           <Button className="mt-6" variant="outline" onClick={() => router.push("/reports")}>
             Reports sayfasına dön
           </Button>
@@ -45,31 +147,21 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
     );
   }
 
-  const handlePrint = () => {
-    addAuditLog({
-      action: "report_printed",
-      module: "Reports",
-      target: report.title,
-      severity: "info",
-      result: "success",
-      details: `${report.title} print görünümünden yazdırıldı.`,
-    });
-    window.print();
-  };
-
   return (
     <main className="hcsc-scrollbar min-h-svh overflow-y-auto bg-[linear-gradient(180deg,#eef2f7_0%,#f5f7fb_100%)] px-4 py-5 text-slate-900 print:bg-white print:px-0 print:py-0">
       <div className="mx-auto flex w-full max-w-[210mm] flex-col overflow-hidden rounded-[28px] border border-slate-200/90 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.1)] print:min-h-[297mm] print:max-w-none print:rounded-none print:border-0 print:shadow-none">
         <div className="print:hidden flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Professional Print Template</p>
-            <p className="mt-1 text-sm text-slate-600">A4 uyumlu HCSC v1 kurumsal rapor görünümü</p>
+            <p className="mt-1 text-sm text-slate-600">A4 uyumlu HCSC v2 rapor çıktısı</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push("/reports")}>
               Geri dön
             </Button>
-            <Button onClick={handlePrint}>Yazdır</Button>
+            <Button onClick={handlePrint} disabled={isPrinting}>
+              {isPrinting ? "Hazırlanıyor..." : "Yazdır"}
+            </Button>
           </div>
         </div>
 
@@ -77,44 +169,47 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
           <div className="space-y-5">
             <header className="overflow-hidden rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,#fbfcff_0%,#f5f8fc_100%)]">
               <div className="border-b border-slate-200/80 px-5 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Hybrid Cloud Security Console</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">{payload.branding.companyName}</p>
               </div>
               <div className="grid gap-5 px-5 py-5 md:grid-cols-[1.35fr,0.65fr]">
                 <div className="max-w-3xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Executive Output</p>
-                  <h1 className="mt-2 text-[29px] font-semibold tracking-[-0.03em] text-slate-950">{report.title}</h1>
+                  <h1 className="mt-2 text-[29px] font-semibold tracking-[-0.03em] text-slate-950">{payload.report.title}</h1>
                   <p className="mt-3 max-w-2xl text-[13px] leading-6 text-slate-600">
-                  {currentOrganization.name} için üretilen bu rapor; hibrit bulut güvenlik görünürlüğünü, Zero Trust kararlarını,
-                  deception olaylarını ve uyumluluk etkilerini kurumsal çıktı formatında özetler.
+                    {payload.organization.name} için üretilen bu rapor; güvenlik duruşunu, Zero Trust kararlarını,
+                    deception sinyallerini ve uyumluluk etkilerini kalıcı snapshot üzerinden sunar.
                   </p>
                 </div>
                 <div className="grid gap-2 rounded-[22px] border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                  <Meta label="Organization" value={currentOrganization.name} />
-                  <Meta label="Prepared By" value={currentUser?.name ?? "HCSC System"} />
-                  <Meta label="Generated At" value={formatDateTime(report.createdAt)} />
-                  <Meta label="Confidentiality" value="Internal / Thesis Prototype" />
+                  <Meta label="Organization" value={payload.organization.name} />
+                  <Meta label="Prepared By" value={payload.preparedBy} />
+                  <Meta label="Generated At" value={formatDateTime(payload.generatedAt)} />
+                  <Meta label="Confidentiality" value={payload.confidentialityLabel} />
                 </div>
               </div>
             </header>
 
             <section className="grid gap-3 md:grid-cols-4">
-              <SnapshotCard label="Security Score" value={`${dashboard.securityScore}/100`} />
-              <SnapshotCard label="Critical Events" value={String(environment.events.filter((event) => event.severity === "critical").length)} />
-              <SnapshotCard label="Compliance" value={`${complianceScores.overallScore}%`} />
-              <SnapshotCard label="Report Type" value={report.type} />
+              <SnapshotCard label="Security Score" value={payload.securityScore !== null ? `${payload.securityScore}/100` : "N/A"} />
+              <SnapshotCard label="Critical Events" value={String(criticalEventCount)} />
+              <SnapshotCard
+                label="Compliance"
+                value={payload.kvkkGdprImpact.kvkkScore !== null ? `${payload.kvkkGdprImpact.kvkkScore}% / ${payload.kvkkGdprImpact.gdprScore ?? 0}%` : "N/A"}
+              />
+              <SnapshotCard label="Report Type" value={payload.report.type} />
             </section>
 
             <Section title="Executive Summary" compact>
-              <p className="text-[13px] leading-6 text-slate-700">{report.summary}</p>
+              <p className="text-[13px] leading-6 text-slate-700">{payload.executiveSummary}</p>
             </Section>
 
             <section className="grid gap-4 lg:grid-cols-[1.08fr,0.92fr]">
               <div className="space-y-4">
                 <Section title="Critical Findings">
-                  <BulletList items={report.findings.slice(0, 3)} />
+                  <BulletList items={payload.criticalFindings.slice(0, 6)} />
                 </Section>
                 <Section title="Affected Assets">
-                  {relatedAssets.length ? (
+                  {payload.affectedAssets.length ? (
                     <div className="overflow-hidden rounded-xl border border-slate-200">
                       <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50">
@@ -124,10 +219,10 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
-                          {relatedAssets.map((asset) => (
+                          {payload.affectedAssets.map((asset) => (
                             <tr key={asset.id}>
                               <td className="px-3 py-2 font-medium text-slate-900">{asset.name}</td>
-                              <td className="px-3 py-2 text-slate-700">{asset.risk.level}</td>
+                              <td className="px-3 py-2 text-slate-700">{asset.riskLevel}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -138,21 +233,28 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
                   )}
                 </Section>
                 <Section title="Recommended Actions" compact>
-                  <BulletList items={report.recommendedActions.slice(0, 3)} />
+                  <BulletList items={payload.recommendedActions.slice(0, 6)} />
                 </Section>
               </div>
 
               <div className="space-y-4">
                 <Section title="Event Timeline">
-                  {relatedEvents.length ? (
+                  {payload.eventTimeline.length ? (
                     <div className="space-y-2">
-                      {relatedEvents.map((event) => (
+                      {payload.eventTimeline.map((event) => (
                         <div key={event.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                           <div className="flex items-center justify-between gap-3">
                             <p className="font-medium text-slate-950">{event.title}</p>
-                            <Badge label={event.severity} tone={reportToneMap[report.type]} />
+                            <Badge label={event.severity} tone={reportTypeTone} />
                           </div>
                           <p className="mt-1 text-[13px] leading-5 text-slate-700">{event.description}</p>
+                          {event.entries.length ? (
+                            <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                              {event.entries.slice(0, 3).map((entry) => (
+                                <li key={`${event.id}-${entry.timestamp}`}>{entry.actor}: {entry.message}</li>
+                              ))}
+                            </ul>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -161,29 +263,37 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
                   )}
                 </Section>
                 <Section title="Risk Matrix">
-                  <BulletList items={report.risks.slice(0, 3)} />
+                  <BulletList items={payload.riskMatrix.map((risk) => `${risk.level.toUpperCase()}: ${risk.label}`)} />
                 </Section>
-                <Section title="Compliance Mapping">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <CompactList
-                      title="NIST CSF"
-                      items={complianceScores.nist.slice(0, 4).map((item) => `${item.name}: ${item.score}%`)}
-                    />
-                    <CompactList
-                      title="KVKK / GDPR"
-                      items={[
-                        `KVKK görünürlüğü ${complianceScores.kvkkScore}% seviyesinde.`,
-                        `GDPR görünürlüğü ${complianceScores.gdprScore}% seviyesinde.`,
-                        "Privacy kapsamlı veri varlıkları transfer ve şifreleme kontrolleriyle izleniyor.",
-                      ]}
-                    />
-                  </div>
+                <Section title="NIST CSF 2.0 Mapping">
+                  <CompactList
+                    title="NIST Functions"
+                    items={payload.nistCsfMapping.slice(0, 6).map((item) => `${item.name}: ${item.score}%`)}
+                  />
+                </Section>
+                <Section title="KVKK / GDPR Impact">
+                  <CompactList
+                    title="Privacy Impact"
+                    items={[
+                      `KVKK görünürlüğü ${payload.kvkkGdprImpact.kvkkScore ?? 0}% seviyesinde.`,
+                      `GDPR görünürlüğü ${payload.kvkkGdprImpact.gdprScore ?? 0}% seviyesinde.`,
+                      payload.kvkkGdprImpact.summary,
+                    ]}
+                  />
                 </Section>
               </div>
             </section>
 
+            <Section title="Appendix / Evidence">
+              {payload.appendix.evidence.length ? (
+                <BulletList items={payload.appendix.evidence.slice(0, 8)} />
+              ) : (
+                <EmptyLine text="Ek kanıt kaydı bulunmuyor." />
+              )}
+            </Section>
+
             <footer className="border-t border-slate-200 pt-4 text-xs text-slate-500">
-              Generated by Hybrid Cloud Security Console • {currentOrganization.name} • {formatDateTime(report.createdAt)}
+              {payload.footer} • {payload.organization.name} • {formatDateTime(payload.generatedAt)}
             </footer>
           </div>
         </article>

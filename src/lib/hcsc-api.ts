@@ -130,6 +130,91 @@ export type ExecutiveDemoPayload = {
   };
 };
 
+export type ReportPrintPayload = {
+  organization: {
+    id: string;
+    name: string;
+    plan: string;
+    region: string;
+    cloudMode: string;
+    complianceFrameworks: string[];
+  };
+  report: {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    createdAt: string;
+    generatedBy?: string | null;
+    summary: string;
+    findings: string[];
+    risks: string[];
+    recommendedActions: string[];
+    relatedControls: string[];
+    markdownContent?: string | null;
+  };
+  branding: {
+    companyName: string;
+    reportFooter: string;
+    preparedByLabel: string;
+    confidentialityLabel: string;
+  };
+  generatedAt: string;
+  preparedBy: string;
+  confidentialityLabel: string;
+  executiveSummary: string;
+  securityScore: number | null;
+  criticalFindings: string[];
+  affectedAssets: Array<{
+    id: string;
+    name: string;
+    classification: string;
+    riskLevel: string;
+    owner: string;
+    location: string;
+  }>;
+  eventTimeline: Array<{
+    id: string;
+    title: string;
+    severity: string;
+    status: string;
+    timestamp: string;
+    description: string;
+    entries: Array<{
+      actor: string;
+      message: string;
+      timestamp: string;
+    }>;
+  }>;
+  riskMatrix: Array<{
+    id: string;
+    label: string;
+    level: string;
+    detail: string;
+  }>;
+  nistCsfMapping: Array<{
+    id: string;
+    name: string;
+    score: number;
+    status: string;
+    gaps: string[];
+    improvements: string[];
+  }>;
+  kvkkGdprImpact: {
+    kvkkScore: number | null;
+    gdprScore: number | null;
+    scopedAssets: number;
+    summary: string;
+  };
+  recommendedActions: string[];
+  appendix: {
+    relatedControls: string[];
+    markdownContent: string;
+    evidence: string[];
+  };
+  footer: string;
+};
+
 export class HcscApiError extends Error {
   status: number;
   code: string;
@@ -324,6 +409,16 @@ export function getReports() {
 
 export function getReport(id: string) {
   return request<ReportItem>(`/api/reports/${id}`, { method: "GET" });
+}
+
+export function getReportPrintPayload(id: string) {
+  return request<ReportPrintPayload>(`/api/reports/${id}/print-payload`, { method: "GET" });
+}
+
+export function printReport(id: string) {
+  return request<{ success: boolean; reportId: string; title: string }>(`/api/reports/${id}/print`, {
+    method: "POST",
+  });
 }
 
 export function generateReport(payload: { type?: string } = {}) {

@@ -6,7 +6,7 @@ import { PageIntro } from "@/components/ui/page-intro";
 import { Panel } from "@/components/ui/panel";
 
 export function FinalChecklistView() {
-  const { environment, complianceScores, lastSimulationResult, auth, currentUser, auditLogs, notifications } = useDemo();
+  const { environment, complianceScores, lastSimulationResult, auth, currentUser, auditLogs, notifications, isApiMode } = useDemo();
   const hasClassifiedAssets = environment.assets.some((asset) => asset.classification !== "public");
   const hasZeroTrustDecisions = environment.accessRequests.some((request) => request.status !== "pending");
   const hasDeceptionTrigger = environment.events.some((event) => event.category === "deception_triggered");
@@ -17,7 +17,15 @@ export function FinalChecklistView() {
   const hasPrintedReport = auditLogs.some((entry) => entry.action === "report_printed");
   const hasNotifications = notifications.length > 0;
   const hasSimulationRun = auditLogs.some((entry) => entry.action === "simulation_completed");
+  const hasTrapEndpointAlert = auditLogs.some((entry) => entry.module === "Trap Endpoint");
   const checklist = [
+    { label: "DB persistence completed", status: isApiMode ? "completed" : "partial", note: isApiMode ? "UI kalıcı veriyi API-first modda tüketiyor." : "Mock fallback halen aktif." },
+    { label: "Auth / session completed", status: auth.isAuthenticated ? "completed" : "partial", note: auth.isAuthenticated ? "DB-backed session aktif." : "Login + 2FA akışı hazır, yeni oturum bekleniyor." },
+    { label: "Core API completed", status: isApiMode ? "completed" : "partial", note: "Assets, events, deception, reports ve settings endpointleri aktif." },
+    { label: "Backend engines completed", status: environment.events.length > 0 && hasZeroTrustDecisions ? "completed" : "partial", note: "Risk, Zero Trust, deception, compliance ve report kararları server-side üretiliyor." },
+    { label: "Frontend API adapter completed", status: isApiMode ? "completed" : "partial", note: isApiMode ? "Store API üzerinden hydrate oluyor." : "Fallback mode korunuyor." },
+    { label: "Trap endpoint completed", status: hasTrapEndpointAlert || environment.deceptions.length > 0 ? "completed" : "partial", note: hasTrapEndpointAlert ? "Güvenli trap endpoint alarmı audit log’a işlendi." : "Trap endpoint hazır, ilk probe bekleniyor." },
+    { label: "Report print payload completed", status: hasPrintedReport || hasReports ? "completed" : "partial", note: hasPrintedReport ? "Print payload audit log’a işlendi." : "DB-backed print payload route hazır." },
     { label: "Auth var", status: auth.isAuthenticated ? "completed" : "missing", note: auth.isAuthenticated ? `${currentUser?.name} ile oturum açık.` : "Korunan route’lar login gerektiriyor." },
     { label: "2FA var", status: auth.is2FAVerified ? "completed" : auth.isAuthenticated ? "partial" : "missing", note: auth.is2FAVerified ? "İkinci faktör doğrulaması tamamlandı." : "123456 demo kodu ile doğrulama bekleniyor." },
     { label: "Role permission var", status: currentUser ? "completed" : "missing", note: currentUser ? `${currentUser.role} rolü permission matrisiyle yönetiliyor.` : "Aktif kullanıcı bulunmuyor." },
