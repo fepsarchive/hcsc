@@ -34,6 +34,7 @@ export function DashboardView() {
     nextDemoStep,
     previousDemoStep,
     startDemoScenario,
+    runExecutiveDemo,
     lastSimulationResult,
   } = useDemo();
 
@@ -80,7 +81,7 @@ export function DashboardView() {
             <ActionButton variant="secondary" onClick={nextDemoStep}>
               İleri
             </ActionButton>
-            <ActionButton onClick={startDemoScenario}>Demo Senaryosu Başlat</ActionButton>
+            <ActionButton onClick={() => void runExecutiveDemo()}>Executive Demo Çalıştır</ActionButton>
           </div>
         </div>
       </div>

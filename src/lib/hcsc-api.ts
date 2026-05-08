@@ -1,0 +1,389 @@
+"use client";
+
+import type {
+  AccessAction,
+  AccessRequest,
+  AppUser,
+  AuditLogItem,
+  ComplianceSnapshot,
+  DataAsset,
+  DeceptionAsset,
+  EventStatus,
+  IdentityProfile,
+  IdentityStatus,
+  NotificationItem,
+  OrganizationProfile,
+  ReportItem,
+  SecurityEvent,
+  SimulationRunResult,
+  SoarAction,
+} from "@/types";
+
+type ApiErrorPayload = {
+  code?: string;
+  message?: string;
+};
+
+type ApiEnvelope<T> = {
+  data: T;
+  meta?: Record<string, unknown>;
+  error?: ApiErrorPayload | null;
+};
+
+type RequestOptions = Omit<RequestInit, "body"> & {
+  body?: unknown;
+};
+
+export type SettingsBundle = {
+  organization: OrganizationProfile;
+  organizationSettings: {
+    region: string;
+    cloudMode: "private_cloud" | "public_cloud" | "hybrid_cloud";
+    complianceFrameworks: string[];
+  } | null;
+  riskPolicy: {
+    criticalClassificationWeight: number;
+    missingEncryptionWeight: number;
+    publicCloudSensitiveWeight: number;
+    missingBackupWeight: number;
+    noKmsWeight: number;
+    openCriticalEventWeight: number;
+    deceptionTriggerWeight: number;
+  } | null;
+  reportBranding: {
+    companyName: string;
+    reportFooter: string;
+    preparedByLabel: string;
+    confidentialityLabel: string;
+  } | null;
+};
+
+export type AuthUserPayload = {
+  authenticated: boolean;
+  twoFactorVerified: boolean;
+  sessionStartedAt: string | null;
+  user: AppUser | null;
+  organization: OrganizationProfile | null;
+  onboardingCompleted: boolean;
+};
+
+export type AccessRequestCreatePayload = {
+  identityProfileId: string;
+  assetId: string;
+  requestedAction: AccessAction;
+  justification?: string;
+  sourceLocation: "private_cloud" | "public_cloud" | "saas" | "backup" | "deception";
+  sourceRegion: string;
+  deviceTrust: "trusted" | "managed" | "unknown" | "compromised";
+  mfa: boolean;
+  anomalyScore: number;
+  locationRisk: "low" | "medium" | "high";
+  timeRisk: "normal" | "elevated" | "off_hours";
+};
+
+export type DeceptionAssetCreatePayload = {
+  name: string;
+  description: string;
+  fakeType: "bucket" | "database" | "api" | "token_store" | "log_archive";
+  mappedThreat: string;
+  severity: "low" | "medium" | "high" | "critical";
+  recommendedResponse: string;
+  autoActions: SoarAction[];
+};
+
+export type DeceptionTriggerRecord = {
+  id: string;
+  sourceIp?: string | null;
+  userAgent?: string | null;
+  requestPath?: string | null;
+  createdAt: string;
+  identityProfileId?: string | null;
+  eventId?: string | null;
+};
+
+export type SimulationListPayload = {
+  simulations: Array<{
+    id: string;
+    title: string;
+    description: string;
+    targetModule: string;
+    expectedOutcome: string;
+    relatedControls: string[];
+    riskLevel?: "low" | "medium" | "high" | "critical";
+    affectedModules?: string[];
+  }>;
+  runs: SimulationRunResult[];
+};
+
+export type ExecutiveDemoPayload = {
+  run: SimulationRunResult | null;
+  summary: {
+    assetId: string;
+    assetName: string;
+    identityId: string;
+    identityName: string;
+    accessRequestId: string | null;
+    accessDecision: string | null;
+    deceptionEventId: string | null;
+    complianceScore: number;
+    reportId: string | null;
+  };
+};
+
+export class HcscApiError extends Error {
+  status: number;
+  code: string;
+  meta?: Record<string, unknown>;
+
+  constructor(message: string, options: { status: number; code?: string; meta?: Record<string, unknown> }) {
+    super(message);
+    this.name = "HcscApiError";
+    this.status = options.status;
+    this.code = options.code ?? "API_ERROR";
+    this.meta = options.meta;
+  }
+}
+
+async function readEnvelope<T>(response: Response) {
+  const text = await response.text();
+
+  if (!text.trim()) {
+    if (!response.ok) {
+      throw new HcscApiError("İstek tamamlanamadı.", { status: response.status });
+    }
+
+    return null as T;
+  }
+
+  let parsed: ApiEnvelope<T>;
+
+  try {
+    parsed = JSON.parse(text) as ApiEnvelope<T>;
+  } catch {
+    throw new HcscApiError("API yanıtı çözümlenemedi.", { status: response.status });
+  }
+
+  if (!response.ok || parsed.error) {
+    throw new HcscApiError(parsed.error?.message ?? "İstek tamamlanamadı.", {
+      status: response.status,
+      code: parsed.error?.code,
+      meta: parsed.meta,
+    });
+  }
+
+  return parsed.data;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}) {
+  const headers = new Headers(options.headers);
+  const body =
+    options.body === undefined
+      ? undefined
+      : typeof options.body === "string"
+        ? options.body
+        : JSON.stringify(options.body);
+
+  if (body !== undefined && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(path, {
+    ...options,
+    headers,
+    body,
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  return readEnvelope<T>(response);
+}
+
+export function getCurrentUser() {
+  return request<AuthUserPayload>("/api/auth/me", { method: "GET" });
+}
+
+export async function getDashboardSummary() {
+  const [assets, accessRequests, events, deceptionAssets, compliance, reports, notifications] = await Promise.all([
+    getAssets(),
+    getAccessRequests(),
+    getEvents(),
+    getDeceptionAssets(),
+    getCurrentCompliance(),
+    getReports(),
+    getNotifications(),
+  ]);
+
+  return {
+    assets,
+    accessRequests,
+    events,
+    deceptionAssets,
+    compliance,
+    reports,
+    notifications,
+  };
+}
+
+export function getAssets() {
+  return request<DataAsset[]>("/api/assets", { method: "GET" });
+}
+
+export function getAsset(id: string) {
+  return request<DataAsset>(`/api/assets/${id}`, { method: "GET" });
+}
+
+export function recalculateAssetRisk(id: string) {
+  return request<DataAsset>(`/api/assets/${id}/recalculate-risk`, { method: "POST" });
+}
+
+export function getIdentities() {
+  return request<IdentityProfile[]>("/api/identities", { method: "GET" });
+}
+
+export function getIdentity(id: string) {
+  return request<IdentityProfile>(`/api/identities/${id}`, { method: "GET" });
+}
+
+export function updateIdentityStatus(id: string, status: IdentityStatus) {
+  return request<IdentityProfile>(`/api/identities/${id}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+}
+
+export function getAccessRequests() {
+  return request<AccessRequest[]>("/api/access-requests", { method: "GET" });
+}
+
+export function createAccessRequest(payload: AccessRequestCreatePayload) {
+  return request<AccessRequest>("/api/access-requests", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function evaluateAccessRequest(id: string) {
+  return request<AccessRequest>(`/api/access-requests/${id}/evaluate`, { method: "POST" });
+}
+
+export function getEvents() {
+  return request<SecurityEvent[]>("/api/events", { method: "GET" });
+}
+
+export function getEvent(id: string) {
+  return request<SecurityEvent>(`/api/events/${id}`, { method: "GET" });
+}
+
+export function updateEventStatus(id: string, status: EventStatus) {
+  return request<SecurityEvent>(`/api/events/${id}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+}
+
+export function runEventPlaybook(id: string, action: SoarAction) {
+  return request<SecurityEvent>(`/api/events/${id}/playbook`, {
+    method: "POST",
+    body: { action },
+  });
+}
+
+export function getDeceptionAssets() {
+  return request<DeceptionAsset[]>("/api/deception-assets", { method: "GET" });
+}
+
+export function createDeceptionAsset(payload: DeceptionAssetCreatePayload) {
+  return request<DeceptionAsset>("/api/deception-assets", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function simulateDeceptionAccess(id: string, payload: { identityProfileId?: string } = {}) {
+  return request(`/api/deception-assets/${id}/simulate-access`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function getDeceptionTriggers(id: string) {
+  return request<DeceptionTriggerRecord[]>(`/api/deception-assets/${id}/triggers`, { method: "GET" });
+}
+
+export function getCurrentCompliance() {
+  return request<ComplianceSnapshot>("/api/compliance/current", { method: "GET" });
+}
+
+export function recalculateCompliance() {
+  return request<ComplianceSnapshot>("/api/compliance/recalculate", { method: "POST" });
+}
+
+export function getReports() {
+  return request<ReportItem[]>("/api/reports", { method: "GET" });
+}
+
+export function getReport(id: string) {
+  return request<ReportItem>(`/api/reports/${id}`, { method: "GET" });
+}
+
+export function generateReport(payload: { type?: string } = {}) {
+  return request<ReportItem>("/api/reports/generate", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function getAuditLogs() {
+  return request<AuditLogItem[]>("/api/audit-logs", { method: "GET" });
+}
+
+export function getNotifications() {
+  return request<NotificationItem[]>("/api/notifications", { method: "GET" });
+}
+
+export function markNotificationRead(id: string) {
+  return request(`/api/notifications/${id}/read`, { method: "POST" });
+}
+
+export function markAllNotificationsRead() {
+  return request("/api/notifications/read-all", { method: "POST" });
+}
+
+export function getSettings() {
+  return request<SettingsBundle>("/api/settings", { method: "GET" });
+}
+
+export function updateRiskPolicy(payload: NonNullable<SettingsBundle["riskPolicy"]>) {
+  return request<SettingsBundle["riskPolicy"]>("/api/settings/risk-policy", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function updateReportBranding(payload: NonNullable<SettingsBundle["reportBranding"]>) {
+  return request<SettingsBundle["reportBranding"]>("/api/settings/report-branding", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function updateOrganizationSettings(payload: {
+  name?: string;
+  plan?: string;
+  region?: string;
+  cloudMode?: "private_cloud" | "public_cloud" | "hybrid_cloud";
+  complianceFrameworks?: string[];
+}) {
+  return request("/api/settings/organization", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function getSimulations() {
+  return request<SimulationListPayload>("/api/simulations", { method: "GET" });
+}
+
+export function runExecutiveDemo() {
+  return request<ExecutiveDemoPayload>("/api/simulations/executive-demo", { method: "POST" });
+}

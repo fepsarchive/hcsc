@@ -15,7 +15,7 @@ const publicRoutes = new Set(["/login", "/verify-2fa", "/onboarding"])
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { auth, onboardingCompleted } = useDemo()
+  const { auth, onboardingCompleted, isHydrating, apiError, isApiMode, lastSyncedAt } = useDemo()
   const contentScrollRef = useRef<HTMLDivElement | null>(null)
   const isPublicRoute = publicRoutes.has(pathname)
   const isScrollablePublicRoute = pathname === "/onboarding"
@@ -102,6 +102,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarInset className="h-svh min-h-svh overflow-hidden">
           <ToastStack />
           <SiteHeader />
+          {isHydrating || apiError ? (
+            <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--text-secondary)]">
+              {isHydrating
+                ? "Veriler API üzerinden senkronize ediliyor..."
+                : `API sync uyarısı: ${apiError}${isApiMode && lastSyncedAt ? ` • Son başarılı sync: ${lastSyncedAt}` : ""}`}
+            </div>
+          ) : null}
           <div
             ref={contentScrollRef}
             className="hcsc-scrollbar min-h-0 min-w-0 flex flex-1 flex-col overflow-y-auto overflow-x-hidden"

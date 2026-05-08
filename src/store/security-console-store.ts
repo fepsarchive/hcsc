@@ -11,6 +11,38 @@ import {
   runSoarPlaybook,
   updateEventStatus as updateSecurityEventStatus,
 } from "@/lib/event-engine";
+import {
+  createAccessRequest as createAccessRequestApi,
+  createDeceptionAsset as createDeceptionAssetApi,
+  evaluateAccessRequest as evaluateAccessRequestApi,
+  generateReport as generateReportApi,
+  getAccessRequests,
+  getAssets,
+  getAuditLogs,
+  getCurrentCompliance,
+  getCurrentUser,
+  getDeceptionAssets,
+  getEvents,
+  getIdentities,
+  getNotifications,
+  getReports,
+  getSettings,
+  getSimulations,
+  HcscApiError,
+  markAllNotificationsRead as markAllNotificationsReadApi,
+  markNotificationRead as markNotificationReadApi,
+  recalculateAssetRisk as recalculateAssetRiskApi,
+  recalculateCompliance as recalculateComplianceApi,
+  runEventPlaybook,
+  runExecutiveDemo as runExecutiveDemoApi,
+  SettingsBundle,
+  simulateDeceptionAccess as simulateDeceptionAccessApi,
+  updateEventStatus as updateEventStatusApi,
+  updateIdentityStatus as updateIdentityStatusApi,
+  updateOrganizationSettings as updateOrganizationSettingsApi,
+  updateReportBranding as updateReportBrandingApi,
+  updateRiskPolicy as updateRiskPolicyApi,
+} from "@/lib/hcsc-api";
 import { createMockEnvironment } from "@/lib/mock-data";
 import { hasPermission } from "@/lib/permissions";
 import { generateReport, generateReports } from "@/lib/report-engine";
@@ -22,7 +54,10 @@ import type {
   AuditLogItem,
   AppUser,
   AuthState,
+  ComplianceSnapshot,
+  DataAsset,
   DemoEnvironment,
+  IdentityProfile,
   NotificationItem,
   OnboardingPayload,
   OrganizationProfile,
@@ -69,6 +104,28 @@ type CreateAuditLogPayload = Omit<AuditLogItem, "id" | "timestamp" | "ipAddress"
 
 type CreateNotificationPayload = Omit<NotificationItem, "id" | "createdAt" | "read">;
 
+type OperationLoadingState = Partial<
+  Record<
+    | "hydrate"
+    | "dashboard"
+    | "assets"
+    | "events"
+    | "deception"
+    | "reports"
+    | "audit"
+    | "notifications"
+    | "settings"
+    | "compliance"
+    | "simulation"
+    | "accessRequest"
+    | "playbook"
+    | "assetRisk"
+    | "identity"
+    | "report",
+    boolean
+  >
+>;
+
 type StoreMeta = {
   selectedAssetId: string | null;
   selectedEventId: string | null;
@@ -83,6 +140,12 @@ type StoreMeta = {
   onboardingCompleted: boolean;
   auditLogs: AuditLogItem[];
   notifications: NotificationItem[];
+  isHydrating: boolean;
+  isApiMode: boolean;
+  apiError: string | null;
+  lastSyncedAt: string | null;
+  operationLoading: OperationLoadingState;
+  settingsBundle: SettingsBundle | null;
 };
 
 export type SecurityConsoleStore = {
@@ -109,18 +172,24 @@ export type SecurityConsoleStore = {
   onboardingCompleted: boolean;
   auditLogs: AuditLogItem[];
   notifications: NotificationItem[];
+  isHydrating: boolean;
+  isApiMode: boolean;
+  apiError: string | null;
+  lastSyncedAt: string | null;
+  operationLoading: OperationLoadingState;
+  settingsBundle: SettingsBundle | null;
   runSimulation: (scenarioId: string) => void;
-  evaluateAccessRequest: (requestId: string) => void;
-  createAccessRequest: (payload: CreateAccessRequestPayload) => void;
+  evaluateAccessRequest: (requestId: string) => Promise<void>;
+  createAccessRequest: (payload: CreateAccessRequestPayload) => Promise<void>;
   updateAccessRequestDecision: (requestId: string, decision: AccessRequest["evaluation"]["decision"]) => void;
   createEvent: (payload: CreateEventPayload) => SecurityEvent;
-  updateEventStatus: (eventId: string, status: SecurityEvent["status"]) => void;
-  runPlaybook: (eventId: string, action?: SoarAction) => void;
-  triggerDeception: (deceptionAssetId?: string, identityId?: string) => void;
-  calculateAssetRisk: (assetId: string) => void;
-  recalculateAllRisks: () => void;
-  generateReport: (type?: ReportType) => void;
-  updateComplianceScores: () => void;
+  updateEventStatus: (eventId: string, status: SecurityEvent["status"]) => Promise<void>;
+  runPlaybook: (eventId: string, action?: SoarAction) => Promise<void>;
+  triggerDeception: (deceptionAssetId?: string, identityId?: string) => Promise<void>;
+  calculateAssetRisk: (assetId: string) => Promise<void>;
+  recalculateAllRisks: () => Promise<void>;
+  generateReport: (type?: ReportType | string) => Promise<void>;
+  updateComplianceScores: () => Promise<void>;
   resetDemoData: () => void;
   seedDemoData: () => void;
   setSelectedAsset: (assetId: string | null) => void;
@@ -129,13 +198,22 @@ export type SecurityConsoleStore = {
   setSelectedDeceptionAsset: (assetId: string | null) => void;
   togglePolicyRule: (ruleId: string) => void;
   addPolicyRule: (rule: NewPolicyInput) => void;
-  createDeceptionStorage: () => void;
+  createDeceptionStorage: () => Promise<void>;
   startDemoScenario: () => void;
   nextDemoStep: () => void;
   previousDemoStep: () => void;
   dismissToast: (toastId: string) => void;
-  runRiskAnalysis: (assetId?: string) => void;
+  runRiskAnalysis: (assetId?: string) => Promise<void>;
   hydrateAuthSession: () => Promise<void>;
+  hydrateFromApi: () => Promise<void>;
+  refreshDashboard: () => Promise<void>;
+  refreshAssets: () => Promise<void>;
+  refreshEvents: () => Promise<void>;
+  refreshDeception: () => Promise<void>;
+  refreshReports: () => Promise<void>;
+  refreshAuditLogs: () => Promise<void>;
+  refreshNotifications: () => Promise<void>;
+  refreshSettings: () => Promise<void>;
   login: (email: string, password: string) => Promise<AuthActionResult>;
   verify2FA: (code: string) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
@@ -143,8 +221,23 @@ export type SecurityConsoleStore = {
   can: (permission: Permission) => boolean;
   addAuditLog: (payload: CreateAuditLogPayload) => void;
   addNotification: (payload: CreateNotificationPayload) => void;
-  markNotificationRead: (id: string) => void;
-  clearNotifications: () => void;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  clearNotifications: () => Promise<void>;
+  simulateDeceptionAccess: (deceptionAssetId: string, payload?: { identityProfileId?: string }) => Promise<void>;
+  runExecutiveDemo: () => Promise<void>;
+  recalculateCompliance: () => Promise<void>;
+  recalculateAssetRisk: (assetId: string) => Promise<void>;
+  updateIdentityStatus: (identityId: string, status: IdentityProfile["status"]) => Promise<void>;
+  updateRiskPolicy: (payload: NonNullable<SettingsBundle["riskPolicy"]>) => Promise<void>;
+  updateReportBranding: (payload: NonNullable<SettingsBundle["reportBranding"]>) => Promise<void>;
+  updateOrganizationSettings: (payload: {
+    name?: string;
+    plan?: string;
+    region?: string;
+    cloudMode?: "private_cloud" | "public_cloud" | "hybrid_cloud";
+    complianceFrameworks?: string[];
+  }) => Promise<void>;
 };
 
 const AUTH_SESSION_KEY = "hcsc-auth-session";
@@ -182,6 +275,12 @@ function createInitialMeta(): StoreMeta {
     onboardingCompleted: false,
     auditLogs: [],
     notifications: [],
+    isHydrating: false,
+    isApiMode: false,
+    apiError: null,
+    lastSyncedAt: null,
+    operationLoading: {},
+    settingsBundle: null,
   };
 }
 
@@ -285,6 +384,59 @@ function getCurrentActor() {
     actorName: currentUser?.name ?? "System",
     actorRole: currentUser?.role ?? "System",
   };
+}
+
+function buildFoundationEnvironment() {
+  return createMockEnvironment();
+}
+
+function setOperationLoading(key: keyof OperationLoadingState, value: boolean) {
+  setMeta({
+    operationLoading: {
+      ...currentMeta.operationLoading,
+      [key]: value,
+    },
+  });
+}
+
+function resolveApiErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof HcscApiError) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function buildApiEnvironmentBundle(input: {
+  assets: DataAsset[];
+  identities: IdentityProfile[];
+  accessRequests: AccessRequest[];
+  events: SecurityEvent[];
+  deceptions: DemoEnvironment["deceptions"];
+  compliance: ComplianceSnapshot;
+  reports: DemoEnvironment["reports"];
+  simulations?: DemoEnvironment["simulations"];
+  runs?: DemoEnvironment["runs"];
+}) {
+  const foundation = buildFoundationEnvironment();
+
+  return {
+    ...foundation,
+    assets: input.assets,
+    identities: input.identities,
+    accessRequests: input.accessRequests,
+    events: input.events,
+    deceptions: input.deceptions,
+    compliance: input.compliance,
+    reports: input.reports,
+    simulations: input.simulations ?? foundation.simulations,
+    runs: input.runs ?? foundation.runs,
+    demoScenario: currentEnvironment.demoScenario ?? foundation.demoScenario,
+  } satisfies DemoEnvironment;
 }
 
 function mapDecisionToStatus(decision: AccessRequest["evaluation"]["decision"]): AccessRequest["status"] {
@@ -433,7 +585,25 @@ function buildSnapshot(environment: DemoEnvironment, meta: StoreMeta): Omit<
   | "addAuditLog"
   | "addNotification"
   | "markNotificationRead"
+  | "markAllNotificationsRead"
   | "clearNotifications"
+  | "hydrateFromApi"
+  | "refreshDashboard"
+  | "refreshAssets"
+  | "refreshEvents"
+  | "refreshDeception"
+  | "refreshReports"
+  | "refreshAuditLogs"
+  | "refreshNotifications"
+  | "refreshSettings"
+  | "simulateDeceptionAccess"
+  | "runExecutiveDemo"
+  | "recalculateCompliance"
+  | "recalculateAssetRisk"
+  | "updateIdentityStatus"
+  | "updateRiskPolicy"
+  | "updateReportBranding"
+  | "updateOrganizationSettings"
 > {
   return {
     environment,
@@ -461,14 +631,27 @@ function buildSnapshot(environment: DemoEnvironment, meta: StoreMeta): Omit<
     onboardingCompleted: meta.onboardingCompleted,
     auditLogs: meta.auditLogs,
     notifications: meta.notifications,
+    isHydrating: meta.isHydrating,
+    isApiMode: meta.isApiMode,
+    apiError: meta.apiError,
+    lastSyncedAt: meta.lastSyncedAt,
+    operationLoading: meta.operationLoading,
+    settingsBundle: meta.settingsBundle,
   };
 }
 
 let currentEnvironment = deriveEnvironment(createMockEnvironment());
 let currentMeta = createInitialMeta();
 
-function setEnvironment(nextEnvironment: MutableEnvironment, metaPatch?: Partial<StoreMeta>) {
-  currentEnvironment = deriveEnvironment(nextEnvironment);
+function setEnvironment(
+  nextEnvironment: MutableEnvironment | DemoEnvironment,
+  metaPatch?: Partial<StoreMeta>,
+  mode: "derived" | "direct" = "derived",
+) {
+  currentEnvironment =
+    mode === "direct"
+      ? (nextEnvironment as DemoEnvironment)
+      : deriveEnvironment(nextEnvironment as MutableEnvironment);
   currentMeta = { ...currentMeta, ...metaPatch };
   persistAuthMeta(currentMeta);
   store = { ...buildSnapshot(currentEnvironment, currentMeta), ...actions };
@@ -656,6 +839,107 @@ function applyDemoStep(current: DemoEnvironment, stepIndex: number) {
     };
 }
 
+async function hydrateEnvironmentFromApi(options?: { silent?: boolean }) {
+  if (!currentMeta.auth.isAuthenticated || !currentMeta.auth.is2FAVerified) {
+    return false;
+  }
+
+  setOperationLoading("hydrate", true);
+  setMeta({
+    isHydrating: true,
+    apiError: null,
+  });
+
+  try {
+    const allowSettings = hasPermission(currentMeta.currentUser?.role, "manage_settings");
+
+    const [
+      assets,
+      identities,
+      accessRequests,
+      events,
+      deceptions,
+      compliance,
+      reports,
+      auditLogs,
+      notifications,
+      simulations,
+      settingsBundle,
+    ] = await Promise.all([
+      getAssets(),
+      getIdentities(),
+      getAccessRequests(),
+      getEvents(),
+      getDeceptionAssets(),
+      getCurrentCompliance(),
+      getReports(),
+      getAuditLogs().catch(() => currentMeta.auditLogs),
+      getNotifications(),
+      getSimulations().catch(() => ({
+        simulations: currentEnvironment.simulations,
+        runs: currentEnvironment.runs,
+      })),
+      allowSettings
+        ? getSettings().catch((error) => {
+            if (error instanceof HcscApiError && [401, 403, 404].includes(error.status)) {
+              return null;
+            }
+
+            throw error;
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const nextEnvironment = buildApiEnvironmentBundle({
+      assets,
+      identities,
+      accessRequests,
+      events,
+      deceptions,
+      compliance,
+      reports,
+      simulations: simulations.simulations,
+      runs: simulations.runs,
+    });
+
+    setEnvironment(
+      nextEnvironment,
+      {
+        auditLogs,
+        notifications,
+        isHydrating: false,
+        isApiMode: true,
+        apiError: null,
+        lastSyncedAt: new Date().toISOString(),
+        settingsBundle,
+        organization: settingsBundle?.organization ?? currentMeta.organization,
+      },
+      "direct",
+    );
+
+    return true;
+  } catch (error) {
+    const message = resolveApiErrorMessage(error, "API verileri senkronize edilemedi.");
+
+    setMeta({
+      isHydrating: false,
+      apiError: message,
+    });
+
+    if (!options?.silent) {
+      pushToast({
+        title: "API senkronizasyonu başarısız",
+        description: message,
+        tone: "warning",
+      });
+    }
+
+    return false;
+  } finally {
+    setOperationLoading("hydrate", false);
+  }
+}
+
 const actions: Pick<
   SecurityConsoleStore,
   | "runSimulation"
@@ -693,7 +977,25 @@ const actions: Pick<
   | "addAuditLog"
   | "addNotification"
   | "markNotificationRead"
+  | "markAllNotificationsRead"
   | "clearNotifications"
+  | "hydrateFromApi"
+  | "refreshDashboard"
+  | "refreshAssets"
+  | "refreshEvents"
+  | "refreshDeception"
+  | "refreshReports"
+  | "refreshAuditLogs"
+  | "refreshNotifications"
+  | "refreshSettings"
+  | "simulateDeceptionAccess"
+  | "runExecutiveDemo"
+  | "recalculateCompliance"
+  | "recalculateAssetRisk"
+  | "updateIdentityStatus"
+  | "updateRiskPolicy"
+  | "updateReportBranding"
+  | "updateOrganizationSettings"
 > = {
   runSimulation(scenarioId) {
     pushAuditLog({
@@ -888,7 +1190,39 @@ const actions: Pick<
     });
   },
 
-  evaluateAccessRequest(requestId) {
+  async evaluateAccessRequest(requestId) {
+    setOperationLoading("accessRequest", true);
+
+    try {
+      const evaluated = await evaluateAccessRequestApi(requestId);
+      const synced = await hydrateEnvironmentFromApi({ silent: true });
+
+      pushToast({
+        title: "Zero Trust kararı üretildi",
+        description: `${evaluated.identityName} için ${evaluated.evaluation.decision} kararı oluşturuldu.`,
+        tone: "policy",
+      });
+
+      if (!synced) {
+        setEnvironment(
+          {
+            ...currentEnvironment,
+            accessRequests: currentEnvironment.accessRequests.map((entry) =>
+              entry.id === requestId ? evaluated : entry,
+            ),
+          },
+          undefined,
+          "direct",
+        );
+      }
+
+      return;
+    } catch {
+      // API unavailable, continue with local deterministic fallback.
+    } finally {
+      setOperationLoading("accessRequest", false);
+    }
+
     const request = currentEnvironment.accessRequests.find((entry) => entry.id === requestId);
     if (!request) return;
     const identity = currentEnvironment.identities.find((entry) => entry.id === request.identityId);
@@ -969,7 +1303,49 @@ const actions: Pick<
     }
   },
 
-  createAccessRequest(payload) {
+  async createAccessRequest(payload) {
+    setOperationLoading("accessRequest", true);
+
+    try {
+      const created = await createAccessRequestApi({
+        identityProfileId: payload.identityId,
+        assetId: payload.targetAssetId,
+        requestedAction: payload.requestedAction,
+        justification: undefined,
+        sourceLocation: payload.sourceLocation,
+        sourceRegion: payload.sourceRegion,
+        deviceTrust: payload.deviceTrust,
+        mfa: payload.mfa,
+        anomalyScore: payload.anomalyScore,
+        locationRisk: payload.locationRisk,
+        timeRisk: payload.timeRisk,
+      });
+
+      const synced = await hydrateEnvironmentFromApi({ silent: true });
+
+      if (!synced) {
+        setEnvironment(
+          {
+            ...currentEnvironment,
+            accessRequests: [created, ...currentEnvironment.accessRequests],
+          },
+          undefined,
+          "direct",
+        );
+      }
+
+      pushToast({
+        title: "Erişim talebi oluşturuldu",
+        description: `${created.identityName} için ${created.targetAssetName} talebi kaydedildi.`,
+        tone: "info",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("accessRequest", false);
+    }
+
     const identity = currentEnvironment.identities.find((entry) => entry.id === payload.identityId);
     const asset = currentEnvironment.assets.find((entry) => entry.id === payload.targetAssetId);
     if (!identity || !asset) return;
@@ -1019,7 +1395,24 @@ const actions: Pick<
     return event;
   },
 
-  updateEventStatus(eventId, status) {
+  async updateEventStatus(eventId, status) {
+    setOperationLoading("events", true);
+
+    try {
+      await updateEventStatusApi(eventId, status);
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Event durumu güncellendi",
+        description: `${eventId} için durum ${status} olarak kaydedildi.`,
+        tone: "info",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("events", false);
+    }
+
     setEnvironment({
       ...currentEnvironment,
       events: currentEnvironment.events.map((event) =>
@@ -1028,7 +1421,24 @@ const actions: Pick<
     });
   },
 
-  runPlaybook(eventId, action) {
+  async runPlaybook(eventId, action) {
+    setOperationLoading("playbook", true);
+
+    try {
+      await runEventPlaybook(eventId, action ?? "mark_contained");
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "SOAR playbook çalıştırıldı",
+        description: action ? `${action} aksiyonu uygulandı.` : "Önerilen playbook aksiyonları yürütüldü.",
+        tone: "success",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("playbook", false);
+    }
+
     const event = currentEnvironment.events.find((entry) => entry.id === eventId);
     if (!event) return;
 
@@ -1060,7 +1470,39 @@ const actions: Pick<
     });
   },
 
-  triggerDeception(deceptionAssetId, identityId) {
+  async triggerDeception(deceptionAssetId, identityId) {
+    setOperationLoading("deception", true);
+
+    try {
+      const resolvedDeception =
+        currentEnvironment.deceptions.find((entry) => entry.id === deceptionAssetId) ??
+        currentEnvironment.deceptions.find((entry) => entry.name === "legacy-customer-db-shadow") ??
+        currentEnvironment.deceptions.find((entry) => entry.name === "admin-secrets-bucket") ??
+        currentEnvironment.deceptions[0];
+      const resolvedIdentity =
+        currentEnvironment.identities.find((entry) => entry.id === identityId) ??
+        currentEnvironment.identities.find((entry) => entry.name === "legacy-api-token") ??
+        currentEnvironment.identities.find((entry) => entry.status === "suspicious") ??
+        currentEnvironment.identities[0];
+
+      if (resolvedDeception) {
+        await simulateDeceptionAccessApi(resolvedDeception.id, {
+          identityProfileId: resolvedIdentity?.id,
+        });
+        await hydrateEnvironmentFromApi({ silent: true });
+        pushToast({
+          title: "Kritik deception alarmı tetiklendi",
+          description: `${resolvedDeception.name} için güvenli erişim simülasyonu tamamlandı.`,
+          tone: "deception",
+        });
+        return;
+      }
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("deception", false);
+    }
+
     const deception =
       currentEnvironment.deceptions.find((entry) => entry.id === deceptionAssetId) ??
       currentEnvironment.deceptions.find((entry) => entry.name === "admin-secrets-bucket");
@@ -1118,7 +1560,36 @@ const actions: Pick<
     });
   },
 
-  calculateAssetRisk(assetId) {
+  async calculateAssetRisk(assetId) {
+    setOperationLoading("assetRisk", true);
+
+    try {
+      const asset = await recalculateAssetRiskApi(assetId);
+      const synced = await hydrateEnvironmentFromApi({ silent: true });
+
+      if (!synced) {
+        setEnvironment(
+          {
+            ...currentEnvironment,
+            assets: currentEnvironment.assets.map((entry) => (entry.id === assetId ? asset : entry)),
+          },
+          undefined,
+          "direct",
+        );
+      }
+
+      pushToast({
+        title: "Risk analizi tamamlandı",
+        description: `${asset.name} için risk skoru yeniden hesaplandı.`,
+        tone: "info",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("assetRisk", false);
+    }
+
     const asset = currentEnvironment.assets.find((entry) => entry.id === assetId);
     if (!asset) return;
     setEnvironment({
@@ -1142,7 +1613,25 @@ const actions: Pick<
     });
   },
 
-  recalculateAllRisks() {
+  async recalculateAllRisks() {
+    setOperationLoading("assetRisk", true);
+
+    try {
+      const targets = currentEnvironment.assets.filter((asset) => !asset.isDeception);
+      await Promise.all(targets.map((asset) => recalculateAssetRiskApi(asset.id)));
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Tüm risk skorları güncellendi",
+        description: "Asset ve kimlik riskleri backend üzerinde tekrar hesaplandı.",
+        tone: "success",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("assetRisk", false);
+    }
+
     setEnvironment({ ...currentEnvironment });
     pushToast({
       title: "Tüm risk skorları güncellendi",
@@ -1159,10 +1648,34 @@ const actions: Pick<
     });
   },
 
-  generateReport(type) {
-    const report = type ? generateReport(type, currentEnvironment) : null;
-    const reports = type
-      ? [report!, ...currentEnvironment.reports.filter((entry) => entry.type !== type)]
+  async generateReport(type) {
+    setOperationLoading("report", true);
+
+    try {
+      await generateReportApi(type ? { type } : {});
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Rapor güncellendi",
+        description: type ? `${type} raporu yeniden üretildi.` : "Tüm raporlar yenilendi.",
+        tone: "compliance",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("report", false);
+    }
+
+    const fallbackReportType =
+      type &&
+      (["general", "critical-data", "zero-trust", "deception", "nist", "privacy", "demo"] as const).includes(
+        type as ReportType,
+      )
+        ? (type as ReportType)
+        : null;
+    const report = fallbackReportType ? generateReport(fallbackReportType, currentEnvironment) : null;
+    const reports = fallbackReportType
+      ? [report!, ...currentEnvironment.reports.filter((entry) => entry.type !== fallbackReportType)]
       : generateReports(currentEnvironment);
 
     setEnvironment({ ...currentEnvironment, reports });
@@ -1189,7 +1702,24 @@ const actions: Pick<
     });
   },
 
-  updateComplianceScores() {
+  async updateComplianceScores() {
+    setOperationLoading("compliance", true);
+
+    try {
+      await recalculateComplianceApi();
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Uyumluluk skorları yeniden hesaplandı",
+        description: "NIST CSF ve KVKK/GDPR görünürlüğü güncellendi.",
+        tone: "compliance",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("compliance", false);
+    }
+
     setEnvironment({ ...currentEnvironment });
     pushToast({
       title: "Uyumluluk skorları yeniden hesaplandı",
@@ -1274,7 +1804,32 @@ const actions: Pick<
     });
   },
 
-  createDeceptionStorage() {
+  async createDeceptionStorage() {
+    setOperationLoading("deception", true);
+
+    try {
+      await createDeceptionAssetApi({
+        name: `generated-decoy-${currentEnvironment.deceptions.length + 1}`,
+        description: "UI üzerinden oluşturulan yeni sahte depolama alanı. Gerçek veri içermez.",
+        fakeType: "bucket",
+        mappedThreat: "Credential Theft / Reconnaissance",
+        severity: "high",
+        recommendedResponse: "Erişen kimliği izole et, MFA zorunlu kıl ve olay bileti oluştur.",
+        autoActions: ["isolate_identity", "require_mfa", "notify_security_team"],
+      });
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Yeni deception storage oluşturuldu",
+        description: "Aktif savunma katmanına yeni bir lure eklendi.",
+        tone: "deception",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("deception", false);
+    }
+
     setEnvironment({
       ...currentEnvironment,
       deceptions: [
@@ -1371,27 +1926,23 @@ const actions: Pick<
     });
   },
 
-  runRiskAnalysis(assetId) {
+  async runRiskAnalysis(assetId) {
     if (assetId) {
-      actions.calculateAssetRisk(assetId);
+      await actions.calculateAssetRisk(assetId);
       return;
     }
-    actions.recalculateAllRisks();
+    await actions.recalculateAllRisks();
   },
 
   async hydrateAuthSession() {
     if (currentMeta.auth.hydrated) return;
 
     try {
-      const response = await fetch("/api/auth/me", {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-      });
-      const result = await parseAuthApiResponse(response);
+      const result = await getCurrentUser();
+      applyServerAuthPayload(result);
 
-      if (result.success) {
-        applyServerAuthPayload(result.data);
+      if (result.authenticated && result.twoFactorVerified) {
+        await hydrateEnvironmentFromApi({ silent: true });
         return;
       }
     } catch {
@@ -1578,6 +2129,7 @@ const actions: Pick<
             description: "Zero Trust ve aktif savunma konsolu kullanıma hazır.",
             tone: "success",
           });
+          await hydrateEnvironmentFromApi({ silent: true });
           pushAuditLog({
             action: "two_factor_verified",
             module: "Authentication",
@@ -1690,6 +2242,7 @@ const actions: Pick<
       window.sessionStorage.removeItem(AUTH_SESSION_KEY);
     }
 
+    const foundation = buildFoundationEnvironment();
     setMeta({
       auth: {
         hydrated: true,
@@ -1701,7 +2254,14 @@ const actions: Pick<
       },
       currentUser: null,
       onboardingCompleted: false,
+      isApiMode: false,
+      apiError: null,
+      lastSyncedAt: null,
+      settingsBundle: null,
+      auditLogs: [],
+      notifications: [],
     });
+    setEnvironment(foundation, undefined, "direct");
 
     pushToast({
       title: "Oturum kapatıldı",
@@ -1716,6 +2276,82 @@ const actions: Pick<
       result: "success",
       details: "Kullanıcı oturumu kapatıldı.",
     });
+  },
+
+  async hydrateFromApi() {
+    await hydrateEnvironmentFromApi();
+  },
+
+  async refreshDashboard() {
+    setOperationLoading("dashboard", true);
+    try {
+      await hydrateEnvironmentFromApi({ silent: true });
+    } finally {
+      setOperationLoading("dashboard", false);
+    }
+  },
+
+  async refreshAssets() {
+    setOperationLoading("assets", true);
+    try {
+      await hydrateEnvironmentFromApi({ silent: true });
+    } finally {
+      setOperationLoading("assets", false);
+    }
+  },
+
+  async refreshEvents() {
+    setOperationLoading("events", true);
+    try {
+      await hydrateEnvironmentFromApi({ silent: true });
+    } finally {
+      setOperationLoading("events", false);
+    }
+  },
+
+  async refreshDeception() {
+    setOperationLoading("deception", true);
+    try {
+      await hydrateEnvironmentFromApi({ silent: true });
+    } finally {
+      setOperationLoading("deception", false);
+    }
+  },
+
+  async refreshReports() {
+    setOperationLoading("reports", true);
+    try {
+      await hydrateEnvironmentFromApi({ silent: true });
+    } finally {
+      setOperationLoading("reports", false);
+    }
+  },
+
+  async refreshAuditLogs() {
+    setOperationLoading("audit", true);
+    try {
+      await hydrateEnvironmentFromApi({ silent: true });
+    } finally {
+      setOperationLoading("audit", false);
+    }
+  },
+
+  async refreshNotifications() {
+    setOperationLoading("notifications", true);
+    try {
+      await hydrateEnvironmentFromApi({ silent: true });
+    } finally {
+      setOperationLoading("notifications", false);
+    }
+  },
+
+  async refreshSettings() {
+    setOperationLoading("settings", true);
+    try {
+      await hydrateEnvironmentFromApi({ silent: true });
+    } finally {
+      setOperationLoading("settings", false);
+    }
   },
 
   completeOnboarding(payload) {
@@ -1737,7 +2373,7 @@ const actions: Pick<
     );
 
     if (payload.runInitialScan) {
-      actions.recalculateAllRisks();
+      void actions.recalculateAllRisks();
     }
 
     pushToast({
@@ -1767,14 +2403,199 @@ const actions: Pick<
     pushNotification(payload);
   },
 
-  markNotificationRead(id) {
+  async markNotificationRead(id) {
+    setOperationLoading("notifications", true);
+
+    try {
+      await markNotificationReadApi(id);
+      await hydrateEnvironmentFromApi({ silent: true });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("notifications", false);
+    }
+
     setMeta({
       notifications: currentMeta.notifications.map((item) => (item.id === id ? { ...item, read: true } : item)),
     });
   },
 
-  clearNotifications() {
-    setMeta({ notifications: [] });
+  async markAllNotificationsRead() {
+    setOperationLoading("notifications", true);
+
+    try {
+      await markAllNotificationsReadApi();
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Bildirimler güncellendi",
+        description: "Tüm bildirimler okundu olarak işaretlendi.",
+        tone: "info",
+      });
+      return;
+    } catch {
+      // API unavailable, continue with local fallback.
+    } finally {
+      setOperationLoading("notifications", false);
+    }
+
+    setMeta({
+      notifications: currentMeta.notifications.map((item) => ({ ...item, read: true })),
+    });
+  },
+
+  async clearNotifications() {
+    await actions.markAllNotificationsRead();
+  },
+
+  async simulateDeceptionAccess(deceptionAssetId, payload) {
+    setOperationLoading("deception", true);
+
+    try {
+      await simulateDeceptionAccessApi(deceptionAssetId, payload);
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Deception erişimi simüle edildi",
+        description: "Kritik event, audit ve bildirim akışı güncellendi.",
+        tone: "deception",
+      });
+      return;
+    } catch (error) {
+      pushToast({
+        title: "Deception simülasyonu başarısız",
+        description: resolveApiErrorMessage(error, "Deception simülasyonu tamamlanamadı."),
+        tone: "warning",
+      });
+    } finally {
+      setOperationLoading("deception", false);
+    }
+  },
+
+  async runExecutiveDemo() {
+    setOperationLoading("simulation", true);
+
+    try {
+      const result = await runExecutiveDemoApi();
+      await hydrateEnvironmentFromApi({ silent: true });
+      setMeta({
+        demoMode: true,
+        lastSimulationResult: result.run ?? currentMeta.lastSimulationResult,
+      });
+      pushToast({
+        title: "Executive demo tamamlandı",
+        description: result.run?.summary ?? "Backend engine akışıyla demo çalıştırıldı.",
+        tone: "success",
+      });
+      return;
+    } catch (error) {
+      pushToast({
+        title: "Executive demo başlatılamadı",
+        description: resolveApiErrorMessage(error, "Executive demo çalıştırılamadı."),
+        tone: "warning",
+      });
+    } finally {
+      setOperationLoading("simulation", false);
+    }
+  },
+
+  async recalculateCompliance() {
+    await actions.updateComplianceScores();
+  },
+
+  async recalculateAssetRisk(assetId) {
+    await actions.calculateAssetRisk(assetId);
+  },
+
+  async updateIdentityStatus(identityId, status) {
+    setOperationLoading("identity", true);
+
+    try {
+      await updateIdentityStatusApi(identityId, status);
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Identity durumu güncellendi",
+        description: `${identityId} için durum ${status} olarak kaydedildi.`,
+        tone: status === "isolated" ? "critical" : "info",
+      });
+      return;
+    } catch (error) {
+      pushToast({
+        title: "Identity güncellenemedi",
+        description: resolveApiErrorMessage(error, "Identity durumu güncellenemedi."),
+        tone: "warning",
+      });
+    } finally {
+      setOperationLoading("identity", false);
+    }
+  },
+
+  async updateRiskPolicy(payload) {
+    setOperationLoading("settings", true);
+
+    try {
+      await updateRiskPolicyApi(payload);
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Risk policy güncellendi",
+        description: "Backend risk policy ayarları kaydedildi.",
+        tone: "success",
+      });
+    } catch (error) {
+      pushToast({
+        title: "Risk policy kaydedilemedi",
+        description: resolveApiErrorMessage(error, "Risk policy güncellenemedi."),
+        tone: "warning",
+      });
+      return;
+    } finally {
+      setOperationLoading("settings", false);
+    }
+  },
+
+  async updateReportBranding(payload) {
+    setOperationLoading("settings", true);
+
+    try {
+      await updateReportBrandingApi(payload);
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Report branding güncellendi",
+        description: "Rapor görünüm ayarları kaydedildi.",
+        tone: "success",
+      });
+    } catch (error) {
+      pushToast({
+        title: "Report branding kaydedilemedi",
+        description: resolveApiErrorMessage(error, "Report branding güncellenemedi."),
+        tone: "warning",
+      });
+      return;
+    } finally {
+      setOperationLoading("settings", false);
+    }
+  },
+
+  async updateOrganizationSettings(payload) {
+    setOperationLoading("settings", true);
+
+    try {
+      await updateOrganizationSettingsApi(payload);
+      await hydrateEnvironmentFromApi({ silent: true });
+      pushToast({
+        title: "Organizasyon ayarları güncellendi",
+        description: "Plan, bölge ve uyumluluk çerçeveleri kaydedildi.",
+        tone: "success",
+      });
+    } catch (error) {
+      pushToast({
+        title: "Organizasyon ayarları kaydedilemedi",
+        description: resolveApiErrorMessage(error, "Organizasyon ayarları güncellenemedi."),
+        tone: "warning",
+      });
+      return;
+    } finally {
+      setOperationLoading("settings", false);
+    }
   },
 };
 

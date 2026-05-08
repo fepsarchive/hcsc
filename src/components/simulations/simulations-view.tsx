@@ -9,7 +9,7 @@ import { Panel } from "@/components/ui/panel";
 import { formatDateTime } from "@/lib/utils";
 
 export function SimulationsView() {
-  const { environment, runSimulation, lastSimulationResult, startDemoScenario, resetDemoData } = useDemo();
+  const { environment, runSimulation, lastSimulationResult, startDemoScenario, runExecutiveDemo, resetDemoData } = useDemo();
   const currentDemoStep = environment.demoScenario.steps[environment.demoScenario.currentStep];
 
   return (
@@ -19,11 +19,14 @@ export function SimulationsView() {
           eyebrow="Simulation Center"
           title="Simülasyonlar"
           description="Bu sayfa, güvenli mock/simülasyon akışlarıyla risk skorlarını, olay üretimini, önerilen aksiyonları ve çapraz modül güncellemelerini tetikler."
-          action={{ label: "Demo Senaryosu Başlat", onClick: startDemoScenario }}
+          action={{ label: "Executive Demo Çalıştır", onClick: () => void runExecutiveDemo() }}
         />
         <div className="mt-4 flex flex-wrap gap-2">
-          <ActionButton variant="secondary" onClick={startDemoScenario}>
-            Demo Senaryosu Başlat
+          <ActionButton variant="secondary" onClick={() => void runExecutiveDemo()}>
+            Executive Demo Çalıştır
+          </ActionButton>
+          <ActionButton variant="ghost" onClick={startDemoScenario}>
+            Sunum Akışını Başlat
           </ActionButton>
           <ActionButton variant="ghost" onClick={resetDemoData}>
             Demo verisini sıfırla

@@ -115,7 +115,7 @@ export function SiteHeader() {
   const {
     environment,
     dashboard,
-    startDemoScenario,
+    runExecutiveDemo,
     generateReport,
     currentUser,
     currentOrganization,
@@ -123,7 +123,7 @@ export function SiteHeader() {
     can,
     notifications,
     markNotificationRead,
-    clearNotifications,
+    markAllNotificationsRead,
   } =
     useDemo()
   const { theme, toggleTheme } = useTheme()
@@ -210,12 +210,12 @@ export function SiteHeader() {
           </Button>
           <Button
             size="sm"
-            onClick={startDemoScenario}
+            onClick={() => void runExecutiveDemo()}
             disabled={!can("run_simulation")}
             title={!can("run_simulation") ? "Bu aksiyon için uygun rol gerekir." : undefined}
           >
             <PlayIcon />
-            Demo Senaryosu Başlat
+            Executive Demo
           </Button>
           <Button
             variant="outline"
@@ -241,8 +241,8 @@ export function SiteHeader() {
             <DropdownMenuContent align="end" className="w-96">
               <DropdownMenuLabel className="flex items-center justify-between gap-2">
                 <span>Notification Center</span>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => clearNotifications()}>
-                  Clear all
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void markAllNotificationsRead()}>
+                  Mark all read
                 </Button>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -253,7 +253,7 @@ export function SiteHeader() {
                       key={notification.id}
                       className="flex cursor-pointer flex-col items-start gap-1 px-3 py-3"
                       onClick={() => {
-                        markNotificationRead(notification.id)
+                        void markNotificationRead(notification.id)
                         if (notification.actionHref) {
                           router.push(notification.actionHref)
                         }
