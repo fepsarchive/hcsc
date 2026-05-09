@@ -2604,14 +2604,18 @@ let store: SecurityConsoleStore = {
   ...actions,
 };
 
+const identitySelector = <T,>(state: T) => state;
+
 function useSecurityConsoleStoreBase<T = SecurityConsoleStore>(
-  selector: (state: SecurityConsoleStore) => T = (state) => state as unknown as T,
+  selector: (state: SecurityConsoleStore) => T = identitySelector as (state: SecurityConsoleStore) => T,
 ) {
-  return useSyncExternalStore(
+  const snapshot = useSyncExternalStore(
     subscribe,
-    () => selector(store),
-    () => selector(store),
+    () => store,
+    () => store,
   );
+
+  return selector(snapshot);
 }
 
 type SecurityConsoleStoreHook = {

@@ -1,27 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { useSecurityConsoleStore } from "@/store/security-console-store";
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {
-  const { auth, hydrateAuthSession, hydrateFromApi } = useSecurityConsoleStore((state) => ({
-    auth: state.auth,
-    hydrateAuthSession: state.hydrateAuthSession,
-    hydrateFromApi: state.hydrateFromApi,
-  }));
+  const hydrateAuthSession = useSecurityConsoleStore((state) => state.hydrateAuthSession);
+  const hasRequestedHydrationRef = useRef(false);
 
   useEffect(() => {
-    void hydrateAuthSession();
-  }, [hydrateAuthSession]);
-
-  useEffect(() => {
-    if (!auth.hydrated || !auth.isAuthenticated || !auth.is2FAVerified) {
+    if (hasRequestedHydrationRef.current) {
       return;
     }
 
-    void hydrateFromApi();
-  }, [auth.hydrated, auth.is2FAVerified, auth.isAuthenticated, hydrateFromApi]);
+    hasRequestedHydrationRef.current = true;
+    void hydrateAuthSession();
+  }, [hydrateAuthSession]);
 
   return <>{children}</>;
 }
