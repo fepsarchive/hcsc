@@ -243,7 +243,7 @@ async function upsertUsers() {
       email: "security.admin@hcsc.local",
       role: UserRole.security_admin,
       department: "Security Operations",
-      avatarInitials: "AK",
+      avatarInitials: "EY",
     },
     {
       id: "user_analyst",
