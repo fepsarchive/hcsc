@@ -18,7 +18,7 @@ export const mockOrganization: OrganizationProfile = {
 export const mockAuthAccounts: MockAuthAccount[] = [
   {
     id: "user-security-admin",
-    name: "Aylin Karaca",
+    name: "Eyşan Yıldırım",
     email: "security.admin@hcsc.local",
     role: "Security Admin",
     avatarInitials: "AK",

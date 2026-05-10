@@ -239,7 +239,7 @@ async function upsertUsers() {
   const users = [
     {
       id: "user_security_admin",
-      name: "Aylin Karaca",
+      name: "Eyşan Yıldırım",
       email: "security.admin@hcsc.local",
       role: UserRole.security_admin,
       department: "Security Operations",
@@ -1333,7 +1333,7 @@ async function upsertAuditLogs() {
   const logs = [
     {
       id: "audit_login_success_seed",
-      actorName: "Aylin Karaca",
+      actorName: "Eyşan Yıldırım",
       actorRole: "Security Admin",
       action: "login_success",
       module: "Auth",
@@ -1347,7 +1347,7 @@ async function upsertAuditLogs() {
     },
     {
       id: "audit_2fa_verified_seed",
-      actorName: "Aylin Karaca",
+      actorName: "Eyşan Yıldırım",
       actorRole: "Security Admin",
       action: "two_factor_verified",
       module: "Auth",
@@ -1375,7 +1375,7 @@ async function upsertAuditLogs() {
     },
     {
       id: "audit_report_generated_seed",
-      actorName: "Aylin Karaca",
+      actorName: "Eyşan Yıldırım",
       actorRole: "Security Admin",
       action: "report_generated",
       module: "Reports",
