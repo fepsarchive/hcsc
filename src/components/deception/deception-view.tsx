@@ -33,20 +33,20 @@ export function DeceptionView() {
       <Panel>
         <PageIntro
           eyebrow="MITRE Engage"
-          title="Deception / Sahte Depolama Alanları"
-          description="Bu sayfa, gerçek veri içermeyen deception varlıklarını, lure skorlarını, adversary engagement görünümünü ve aktif savunma alarm akışlarını daha kurumsal bir database konsolu diliyle sunar."
+          title="Deception / Aktif Savunma Tuzakları"
+          description="Bu sayfa, gerçek veri içermeyen deception varlıklarını, lure skorlarını, adversary engagement görünümünü ve aktif savunma alarm akışlarını kurumsal bir operasyon diliyle sunar."
         />
         <div className="mt-5 flex flex-wrap gap-3">
           <Button onClick={createDeceptionStorage}>Sahte depolama oluştur</Button>
           <Button variant="secondary" onClick={() => triggerDeception()}>
-            Erişim simüle et
+            Erişim akışını tetikle
           </Button>
           <Button variant="secondary" onClick={() => triggerDeception("dec-1", "id-vendor-api")}>
-            Deception alarmı üret
+            Alarm akışı üret
           </Button>
           {latestDeceptionEvent ? (
             <Button variant="secondary" onClick={() => runPlaybook(latestDeceptionEvent.id, "isolate_identity")}>
-              İzolasyon playbook&apos;u çalıştır
+              İzolasyon playbook&apos;unu çalıştır
             </Button>
           ) : null}
         </div>
@@ -56,18 +56,18 @@ export function DeceptionView() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
-              Sahte Veritabanı Tuzak Senaryosu
+              Sahte veritabanı koruma akışı
             </p>
             <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">legacy-customer-db-shadow</h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-secondary)]">
-              Bu senaryo, saldırganın gerçek veri içermeyen ancak gerçekçi görünen bir sahte veritabanına erişmeye çalışması durumunda sistemin erken uyarı üretmesini simüle eder.
+              Bu akış, gerçek veri içermeyen ancak gerçekçi görünen bir sahte veritabanına erişim denemesi karşısında sistemin erken uyarı üretmesini gösterir.
             </p>
             <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">
-              Bu kaynak gerçek veri içermez. Tez kapsamında aktif savunma/deception yaklaşımını göstermek için tasarlanmış güvenli bir simülasyondur.
+              Bu kaynak gerçek veri içermez. Aktif savunma ve erken uyarı için tasarlanmış kontrollü bir tuzaktır.
             </p>
           </div>
           <Button onClick={() => triggerDeception("dec-9", "id-legacy-token")}>
-            Sahte Veritabanı Erişimini Simüle Et
+            Sahte veritabanı akışını tetikle
           </Button>
         </div>
       </Panel>
@@ -147,7 +147,7 @@ export function DeceptionView() {
 
             {lastSimulationResult ? (
               <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">Son simülasyon etkisi</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Son çalışma etkisi</p>
                 <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">{lastSimulationResult.summary}</p>
               </div>
             ) : null}
@@ -175,7 +175,7 @@ export function DeceptionView() {
       <Drawer
         open={Boolean(selected)}
         onClose={() => setSelectedDeceptionAsset(null)}
-        title={selected?.name ?? "Deception detail"}
+        title={selected?.name ?? "Deception ayrıntısı"}
         subtitle="Sahte depolama varlığı için aktif savunma detayları"
         badge={
           selected ? (
@@ -192,16 +192,16 @@ export function DeceptionView() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <MetricField label="Contains Real Data" value={selected.containsRealData ? "Evet" : "Hayır"} />
-              <MetricField label="Fake Type" value={selected.fakeType ?? "storage"} />
-              <MetricField label="Lure Score" value={String(selected.lureScore)} />
-              <MetricField label="Trigger Count" value={String(selected.triggerCount)} />
-              <MetricField label="Last Triggered" value={selected.lastTriggeredAt ? formatDateTime(selected.lastTriggeredAt) : "Henüz yok"} />
-              <MetricField label="Mapped Threat" value={selected.mappedThreat} />
+              <MetricField label="Gerçek veri" value={selected.containsRealData ? "Evet" : "Hayır"} />
+              <MetricField label="Tuzak tipi" value={selected.fakeType ?? "storage"} />
+              <MetricField label="Lure skoru" value={String(selected.lureScore)} />
+              <MetricField label="Tetiklenme sayısı" value={String(selected.triggerCount)} />
+              <MetricField label="Son tetiklenme" value={selected.lastTriggeredAt ? formatDateTime(selected.lastTriggeredAt) : "Henüz yok"} />
+              <MetricField label="Eşleşen tehdit" value={selected.mappedThreat} />
             </div>
 
             <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Auto Actions</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Otomatik aksiyonlar</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {selected.autoActions.map((action) => (
                   <RelationPill key={action} label={action} tone="deception" />
@@ -210,7 +210,7 @@ export function DeceptionView() {
             </div>
 
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Recommended Response</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Önerilen yanıt</p>
               <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{selected.recommendedResponse}</p>
             </div>
           </div>

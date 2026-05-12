@@ -58,7 +58,7 @@ export function AuditLogsView() {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Traceability</p>
             <h1 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">Audit Logs</h1>
             <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-              Kimlik doğrulama, Zero Trust kararları, deception alarmları, rapor üretimi ve simülasyon akışları için denetlenebilir kayıtlar.
+              Kimlik doğrulama, Zero Trust kararları, deception alarmları, rapor üretimi ve operasyon çalıştırmaları için denetlenebilir kayıtlar.
             </p>
           </div>
           <div className="w-full max-w-[780px]">
@@ -146,7 +146,7 @@ export function AuditLogsView() {
             <div className="mx-auto max-w-[780px]">
               <EmptyState
                 title="Henüz audit kaydı bulunmuyor"
-                description="Kimlik, olay, rapor veya simülasyon aksiyonları oluştukça bu alanda denetim kayıtları görünür."
+                description="Kimlik, olay, rapor veya operasyon aksiyonları oluştukça bu alanda denetim kayıtları görünür."
               />
             </div>
           </div>

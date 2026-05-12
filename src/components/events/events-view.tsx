@@ -382,7 +382,7 @@ function PanelLikeTimeline({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[var(--text-primary)]">
-                Son simülasyon: {simulationTitle ?? "Çalıştırılan senaryo"}
+                Son çalışma: {simulationTitle ?? "Çalıştırılan senaryo"}
               </p>
               <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{lastSimulationResult.summary}</p>
             </div>

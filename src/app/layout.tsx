@@ -21,7 +21,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Hybrid Cloud Security Console",
-  description: "Hibrit bulut veri güvenliği için aktif savunma tabanlı tez prototipi",
+  description: "Hibrit bulut veri güvenliği, aktif savunma ve operasyon görünürlüğü için birleşik güvenlik platformu",
 };
 
 export default function RootLayout({
@@ -35,7 +35,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("h-full", "antialiased", manrope.variable, plexMono.variable, "font-sans", geist.variable)}
     >
-      <body className="h-svh min-h-full overflow-hidden bg-slate-950">
+      <body className="h-svh min-h-full overflow-hidden bg-background text-foreground [padding-bottom:env(safe-area-inset-bottom)]">
         <ThemeProvider>
           <DemoProvider>
             <AppShell>{children}</AppShell>

@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheckIcon } from "lucide-react";
+import { ArrowRightIcon, ShieldCheckIcon } from "lucide-react";
 
+import { AuthLinks, AuthMessage, AuthShell } from "@/components/auth/auth-shell";
 import { useDemo } from "@/components/layout/demo-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,11 +15,14 @@ export default function VerifyTwoFactorPage() {
   const { verify2FA, currentUser, onboardingCompleted } = useDemo();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const maskedEmail = useMemo(() => currentUser?.email ?? "security.admin@hcsc.local", [currentUser?.email]);
 
   const handleVerify = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setIsSubmitting(true);
     const result = await verify2FA(code);
+    setIsSubmitting(false);
 
     if (!result.success) {
       setError(result.error ?? "Kod doğrulanamadı.");
@@ -30,61 +34,61 @@ export default function VerifyTwoFactorPage() {
   };
 
   return (
-    <main className="flex h-svh items-center justify-center overflow-hidden bg-background px-6 py-10">
-      <div className="w-full max-w-md rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
-        <div className="flex items-center gap-3">
-          <div className="flex size-12 items-center justify-center rounded-2xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-300">
-            <ShieldCheckIcon className="size-5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Two Factor Verification</p>
-            <h1 className="text-xl font-semibold text-[var(--text-primary)]">2FA doğrulaması</h1>
-          </div>
+    <AuthShell
+      eyebrow="Two Factor Verification"
+      title="2FA doğrulamasını tamamla"
+      description={`${maskedEmail} hesabı için güvenli oturumu tamamlamak üzere 6 haneli doğrulama kodunu gir.`}
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Badge variant="outline">Doğrulama kodu: 123456</Badge>
+          <AuthLinks primaryHref="/login" primaryLabel="Farklı hesapla giriş yap" />
         </div>
+      }
+    >
+      <div className="space-y-4">
+        {error ? <AuthMessage tone="critical" title="Kod doğrulanamadı" description={error} /> : null}
 
-        <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">
-          <span className="font-medium text-[var(--text-primary)]">{maskedEmail}</span> hesabı için güvenli oturumu tamamlamak üzere 6 haneli kodu gir.
-        </p>
-
-        <form className="mt-6 space-y-4" onSubmit={handleVerify}>
-          <Input
-            value={code}
-            onChange={(event) => {
-              const next = event.target.value.replace(/\D/g, "").slice(0, 6);
-              setCode(next);
-              setError(null);
-            }}
-            inputMode="numeric"
-            placeholder="123456"
-            className="h-14 text-center text-2xl tracking-[0.45em]"
-            aria-label="2FA kodu"
-          />
-
-          {error ? (
-            <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-              {error}
+        <form className="space-y-4" onSubmit={handleVerify}>
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-5">
+            <div className="flex items-center gap-3">
+              <div className="flex size-11 items-center justify-center rounded-2xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-300">
+                <ShieldCheckIcon className="size-5" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Secure Session</p>
+                <p className="text-sm text-[var(--text-secondary)]">MFA adımı tamamlandıktan sonra rol bazlı görünüm yüklenir.</p>
+              </div>
             </div>
-          ) : null}
 
-          <Button type="submit" className="w-full">
-            Doğrula
+            <Input
+              value={code}
+              onChange={(event) => {
+                const next = event.target.value.replace(/\D/g, "").slice(0, 6);
+                setCode(next);
+                setError(null);
+              }}
+              inputMode="numeric"
+              placeholder="123456"
+              className="mt-5 h-14 rounded-2xl text-center text-2xl tracking-[0.45em]"
+              aria-label="2FA kodu"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setCode("123456")}>
+              Kodu otomatik doldur
+            </Button>
+            <Button type="button" variant="ghost" className="rounded-xl">
+              Kodu yeniden gönder
+            </Button>
+          </div>
+
+          <Button type="submit" className="h-11 w-full rounded-xl" disabled={isSubmitting}>
+            {isSubmitting ? "Doğrulanıyor..." : "Doğrula ve devam et"}
+            {!isSubmitting ? <ArrowRightIcon /> : null}
           </Button>
         </form>
-
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <Badge variant="outline">Demo code: 123456</Badge>
-          <Button variant="outline" size="sm" onClick={() => setCode("123456")}>
-            Kodu otomatik doldur
-          </Button>
-          <Button variant="ghost" size="sm">
-            Kodu yeniden gönder
-          </Button>
-        </div>
-
-        <p className="mt-5 text-xs leading-5 text-[var(--text-muted)]">
-          Bu doğrulama ekranı gerçek SMS/e-posta göndermez. Tez savunması için güvenli oturum ve MFA akışını simüle eder.
-        </p>
       </div>
-    </main>
+    </AuthShell>
   );
 }

@@ -40,6 +40,9 @@ export type SettingsBundle = {
     region: string;
     cloudMode: "private_cloud" | "public_cloud" | "hybrid_cloud";
     complianceFrameworks: string[];
+    usageType?: string | null;
+    defaultCurrency?: string | null;
+    setupCompletedAt?: string | null;
   } | null;
   riskPolicy: {
     criticalClassificationWeight: number;
@@ -65,6 +68,34 @@ export type AuthUserPayload = {
   user: AppUser | null;
   organization: OrganizationProfile | null;
   onboardingCompleted: boolean;
+};
+
+export type RegisterAccountPayload = {
+  fullName: string;
+  email: string;
+  password: string;
+  companyName: string;
+};
+
+export type ForgotPasswordResponse = {
+  message: string;
+};
+
+export type ResetPasswordPayload = {
+  token: string;
+  password: string;
+  confirmPassword: string;
+};
+
+export type OnboardingRequestPayload = {
+  organizationName: string;
+  city?: string;
+  usageType?: "saas" | "fintech" | "retail" | "platform" | "managed-security";
+  defaultCurrency?: "TRY" | "USD" | "EUR" | "GBP";
+  cloudMode: "private_cloud" | "public_cloud" | "hybrid_cloud";
+  complianceFrameworks: string[];
+  seedStarterData: boolean;
+  runInitialScan: boolean;
 };
 
 export type AccessRequestCreatePayload = {
@@ -285,6 +316,37 @@ async function request<T>(path: string, options: RequestOptions = {}) {
 
 export function getCurrentUser() {
   return request<AuthUserPayload>("/api/auth/me", { method: "GET" });
+}
+
+export function registerAccount(payload: RegisterAccountPayload) {
+  return request<AuthUserPayload>("/api/auth/register", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function requestPasswordReset(email: string) {
+  return request<ForgotPasswordResponse>("/api/auth/forgot-password", {
+    method: "POST",
+    body: { email },
+  });
+}
+
+export function resetPassword(payload: ResetPasswordPayload) {
+  return request<{ success: boolean; message: string }>("/api/auth/reset-password", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function completeOnboarding(payload: OnboardingRequestPayload) {
+  return request<{
+    organization: OrganizationProfile;
+    onboardingCompleted: boolean;
+  }>("/api/auth/onboarding", {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export async function getDashboardSummary() {

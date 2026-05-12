@@ -16,40 +16,40 @@ export function SimulationsView() {
     <div className="grid gap-5 xl:grid-cols-[1.2fr,0.8fr]">
       <Panel>
         <PageIntro
-          eyebrow="Simulation Center"
-          title="Simülasyonlar"
-          description="Bu sayfa, güvenli mock/simülasyon akışlarıyla risk skorlarını, olay üretimini, önerilen aksiyonları ve çapraz modül güncellemelerini tetikler."
-          action={{ label: "Executive Demo Çalıştır", onClick: () => void runExecutiveDemo() }}
+          eyebrow="Scenario Center"
+          title="Senaryo Çalıştırma Merkezi"
+          description="Bu sayfa, güvenli operasyon senaryolarıyla risk skorlarını, olay üretimini, önerilen aksiyonları ve çapraz modül güncellemelerini tetikler."
+          action={{ label: "Guided Run Başlat", onClick: () => void runExecutiveDemo() }}
         />
         <div className="mt-4 flex flex-wrap gap-2">
           <ActionButton variant="secondary" onClick={() => void runExecutiveDemo()}>
-            Executive Demo Çalıştır
+            Guided Run Başlat
           </ActionButton>
           <ActionButton variant="ghost" onClick={startDemoScenario}>
-            Sunum Akışını Başlat
+            Executive Briefing Akışını Başlat
           </ActionButton>
           <ActionButton variant="ghost" onClick={resetDemoData}>
-            Demo verisini sıfırla
+            Çalışma verisini yenile
           </ActionButton>
           <Link
             href="/presentation"
             className="inline-flex h-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[13px] font-medium text-[var(--text-secondary)] transition hover:bg-[color-mix(in_srgb,var(--surface)_86%,white_5%)] hover:text-[var(--text-primary)]"
           >
-            Presentation Mode
+            Executive Briefing
           </Link>
         </div>
 
         <div className="mt-6 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Demo akışı durumu</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Operasyon akışı durumu</p>
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                 {currentDemoStep?.title}: {currentDemoStep?.description}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge
-                label={environment.demoScenario.active ? "aktif demo" : "hazır"}
+                label={environment.demoScenario.active ? "aktif akış" : "hazır"}
                 tone={environment.demoScenario.active ? "deception" : "neutral"}
               />
               <Badge label={`Adım ${environment.demoScenario.currentStep + 1}`} tone="policy" />
@@ -89,7 +89,7 @@ export function SimulationsView() {
       </Panel>
 
       <Panel>
-        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Son simülasyon çıktıları</h2>
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Son çalıştırma çıktıları</h2>
         {lastSimulationResult ? (
           <div className="mt-5 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
             <p className="font-semibold text-[var(--text-primary)]">Aktif sonuç özeti</p>

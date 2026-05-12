@@ -116,7 +116,7 @@ export async function simulateDeceptionAccess(input: {
     target: result.deceptionAsset.name,
     severity: "critical",
     result: "success",
-    details: `${result.deceptionAsset.name} için güvenli deception simülasyonu çalıştırıldı.`,
+    details: `${result.deceptionAsset.name} için güvenli deception akışı çalıştırıldı.`,
     ipAddress: input.actor.ipAddress,
     device: input.actor.userAgent,
     metadata: {

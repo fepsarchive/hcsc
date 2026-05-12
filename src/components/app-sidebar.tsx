@@ -4,7 +4,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   BadgeCheckIcon,
-  BookOpenIcon,
   DatabaseIcon,
   FileChartColumnIcon,
   FlaskConicalIcon,
@@ -51,15 +50,14 @@ const workspaceItems = [
   { title: "Compliance", href: "/compliance", icon: BadgeCheckIcon },
   { title: "Threat Matrix", href: "/threat-matrix", icon: WaypointsIcon },
   { title: "Reports", href: "/reports", icon: FileChartColumnIcon },
-  { title: "Simulations", href: "/simulations", icon: FlaskConicalIcon },
-  { title: "Presentation Mode", href: "/presentation", icon: PresentationIcon },
+  { title: "Scenarios", href: "/simulations", icon: FlaskConicalIcon },
+  { title: "Executive Briefing", href: "/presentation", icon: PresentationIcon },
 ] as const
 
 const systemItems = [
-  { title: "Final Checklist", href: "/final-checklist", icon: ListChecksIcon },
+  { title: "Platform Status", href: "/final-checklist", icon: ListChecksIcon },
   { title: "Audit Logs", href: "/audit-logs", icon: LogsIcon },
   { title: "Settings", href: "/settings", icon: Settings2Icon },
-  { title: "Documentation", href: "/presentation", icon: BookOpenIcon },
 ] as const
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -85,7 +83,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">{currentOrganization.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">Active Defense Prototype</span>
+                  <span className="truncate text-xs text-muted-foreground">Active Defense Workspace</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -193,8 +191,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Prototype</span>
-            <span>v1.0</span>
+            <span>Workspace</span>
+            <span>Live</span>
           </div>
         </div>
       </SidebarFooter>

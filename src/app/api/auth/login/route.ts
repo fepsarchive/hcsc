@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
 import { verifyPassword } from "@/server/auth/password";
+import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { buildRequestMeta, createAuthAuditLog, createPendingSession, setSessionCookie } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 
@@ -31,6 +32,26 @@ export async function POST(request: NextRequest) {
   }
 
   const email = parsed.data.email.toLowerCase();
+  const rateLimit = consumeRateLimit({
+    key: `auth:login:${meta.ipAddress ?? "unknown"}:${email}`,
+    limit: 10,
+    windowMs: 1000 * 60 * 10,
+  });
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        data: null,
+        meta: { requestId: meta.requestId, retryAfterSeconds: rateLimit.retryAfterSeconds },
+        error: {
+          code: "RATE_LIMITED",
+          message: "Çok fazla giriş denemesi yapıldı. Lütfen kısa süre sonra tekrar dene.",
+        },
+      },
+      { status: 429 },
+    );
+  }
+
   const user = await prisma.user.findUnique({
     where: { email },
     include: {

@@ -14,7 +14,10 @@ import {
 } from "@/components/database/data-table";
 import { ActionButton } from "@/components/ui/action-button";
 import { AvatarToken } from "@/components/ui/avatar-token";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import { MetricCard } from "@/components/ui/metric-card";
+import { PageHeader } from "@/components/ui/page-header";
 import { Panel } from "@/components/ui/panel";
 import { RelationPill } from "@/components/ui/relation-pill";
 import { RiskBadge } from "@/components/ui/risk-badge";
@@ -36,6 +39,7 @@ export function DashboardView() {
     startDemoScenario,
     runExecutiveDemo,
     lastSimulationResult,
+    isHydrating,
   } = useDemo();
 
   const currentDemoStep = environment.demoScenario.steps[environment.demoScenario.currentStep];
@@ -58,32 +62,50 @@ export function DashboardView() {
     [environment.compliance.nist],
   );
 
+  const hasOperationalData =
+    environment.assets.length > 0 ||
+    environment.events.length > 0 ||
+    environment.reports.length > 0;
+
+  if (isHydrating && !hasOperationalData) {
+    return (
+      <LoadingState
+        title="Dashboard hazırlanıyor"
+        description="Güvenlik skoru, olay görünürlüğü ve deception verileri API üzerinden yükleniyor."
+      />
+    );
+  }
+
+  if (!hasOperationalData) {
+    return (
+      <EmptyState
+        title="İlk güvenlik görünümün hazır olduğunda dashboard burada canlanacak"
+        description="Başlangıç verilerini yükleyebilir, rehberli çalıştırma başlatabilir veya onboarding sonrası ilk taramayı başlatarak kartları doldurabilirsin."
+        primaryAction={<ActionButton onClick={() => void runExecutiveDemo()}>Guided Run Başlat</ActionButton>}
+        secondaryAction={<ActionButton variant="secondary" onClick={startDemoScenario}>Operasyon Akışını Başlat</ActionButton>}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="px-1">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
-              Security Overview
-            </p>
-            <h1 className="mt-1 text-balance text-[20px] font-semibold text-[var(--text-primary)]">
-              Hibrit bulut güvenlik durumu
-            </h1>
-            <p className="mt-1 text-pretty text-[13px] leading-6 text-[var(--text-secondary)]">
-              Güvenlik skoru, olay yoğunluğu, yüksek riskli veri varlıkları ve demo akışı tek görünümde sunulur.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <ActionButton variant="secondary" onClick={previousDemoStep}>
-              Geri
-            </ActionButton>
-            <ActionButton variant="secondary" onClick={nextDemoStep}>
-              İleri
-            </ActionButton>
-            <ActionButton onClick={() => void runExecutiveDemo()}>Executive Demo Çalıştır</ActionButton>
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="Security Overview"
+          title="Hibrit bulut güvenlik durumu"
+          description="Güvenlik skoru, olay yoğunluğu, yüksek riskli veri varlıkları ve operasyon akışı tek görünümde sunulur."
+          actions={
+            <>
+              <ActionButton variant="secondary" onClick={previousDemoStep}>
+                Geri
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={nextDemoStep}>
+                İleri
+              </ActionButton>
+              <ActionButton onClick={() => void runExecutiveDemo()}>Guided Run Başlat</ActionButton>
+            </>
+          }
+        />
       </div>
 
       <Panel className="overflow-hidden rounded-[14px] p-0">
@@ -246,11 +268,11 @@ export function DashboardView() {
         <Panel className="overflow-hidden rounded-[14px] p-0">
           <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3 lg:px-5">
             <div>
-              <h2 className="text-base font-semibold text-[var(--text-primary)]">Demo Senaryo Akışı</h2>
+              <h2 className="text-base font-semibold text-[var(--text-primary)]">Operasyon Senaryo Akışı</h2>
               <p className="text-sm text-[var(--text-muted)]">Access Request → Zero Trust → SIEM → Deception → Report</p>
             </div>
             <StatusBadge
-              label={environment.demoScenario.active ? "aktif demo" : "hazır"}
+              label={environment.demoScenario.active ? "aktif akış" : "hazır"}
               tone={environment.demoScenario.active ? "deception" : "info"}
             />
           </div>
@@ -282,12 +304,12 @@ export function DashboardView() {
                 <ActionButton variant="secondary" onClick={nextDemoStep}>
                   İleri
                 </ActionButton>
-                <ActionButton onClick={startDemoScenario}>Baştan Başlat</ActionButton>
+                <ActionButton onClick={startDemoScenario}>Akışı Baştan Başlat</ActionButton>
               </div>
 
               {lastSimulationResult ? (
                 <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-3">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Son simülasyon etkisi</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Son çalıştırma etkisi</p>
                   <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{lastSimulationResult.summary}</p>
                 </div>
               ) : null}

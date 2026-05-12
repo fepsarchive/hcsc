@@ -2,13 +2,13 @@
 
 ## Genel özet
 
-HCSC, v1 tez prototipinden v2 foundation aşamasına taşındı. Bu sürümde ürünleşme için gerekli kalıcı veri, backend API, auth/session, engine ve print/trap omurgası tamamlandı.
+HCSC, v2 foundation aşamasında kalıcı veri, backend API, auth/session, engine ve print/trap omurgasını tamamlayarak ürün seviyesine taşındı.
 
 ## Paket 1 — Prisma + PostgreSQL + Schema + Seed
 
 - Prisma + PostgreSQL foundation kuruldu
 - organization-scoped schema oluşturuldu
-- idempotent seed ve demo veriler eklendi
+- idempotent seed ve başlangıç verileri eklendi
 - setup ve migration dokümantasyonu hazırlandı
 
 ## Paket 2 — Auth / Session / 2FA Persistence
@@ -16,7 +16,7 @@ HCSC, v1 tez prototipinden v2 foundation aşamasına taşındı. Bu sürümde ü
 - backend auth helper’ları eklendi
 - login / verify-2fa / logout / me endpointleri eklendi
 - session cookie DB-backed hale geldi
-- demo password ve demo 2FA doğrulama akışı korundu
+- yerel geliştirme parolası ve geçici 2FA doğrulama akışı korundu
 
 ## Paket 3 — Core API + Persistence
 
@@ -29,13 +29,13 @@ HCSC, v1 tez prototipinden v2 foundation aşamasına taşındı. Bu sürümde ü
 - Risk Engine server-side çalışır hale geldi
 - Zero Trust kararları backend’e taşındı
 - Deception, Event/SOAR, Compliance ve Report engine’leri backend service katmanına alındı
-- executive demo orchestration server-side tamamlandı
+- guided run orchestration server-side tamamlandı
 
 ## Paket 5 — Frontend API Adapter + UI Bağlantıları
 
 - store API-first hydrate olacak şekilde güncellendi
 - dashboard, assets, events, deception, reports, audit logs, notifications ve settings API’den okunur hale geldi
-- mock fallback korundu
+- yerel fallback korundu
 - v1 UI/UX dili bozulmadı
 
 ## Paket 6 — Trap Endpoint + Report Print + Release Hardening
@@ -48,7 +48,7 @@ HCSC, v1 tez prototipinden v2 foundation aşamasına taşındı. Bu sürümde ü
 
 ## v1’den v2’ye gelen temel değişiklikler
 
-- local/mock merkezli prototip yapıdan kalıcı DB-backed foundation’a geçildi
+- yerel fallback merkezli yapıdan kalıcı DB-backed foundation’a geçildi
 - auth/session backend’e taşındı
 - domain verileri API üzerinden yönetilir hale geldi
 - iş kuralları frontend’den backend engine katmanına alındı
@@ -57,6 +57,6 @@ HCSC, v1 tez prototipinden v2 foundation aşamasına taşındı. Bu sürümde ü
 ## Bilinen sınırlar
 
 - production deploy için Prisma/Vercel zinciri final cleanup ile tekrar doğrulanmalı
-- bazı ekranlarda mock fallback halen korundu
+- bazı ekranlarda yerel fallback halen korundu
 - gerçek SSO, gerçek TOTP sağlayıcısı ve dış sistem connector’ları foundation sonrası genişletilecek
 - trap endpoint etik olarak yalnızca güvenli deception logging yüzeyidir

@@ -9,21 +9,30 @@ export function PresentationView() {
   const { environment, startDemoScenario, nextDemoStep, previousDemoStep, lastSimulationResult, reports, complianceScores } = useDemo();
   const current = environment.demoScenario.steps[environment.demoScenario.currentStep];
   const latestDemoReport = reports.find((report) => report.type === "demo") ?? reports[0] ?? null;
+  const reportLabelMap = {
+    general: "Genel",
+    "critical-data": "Kritik veri",
+    "zero-trust": "Zero Trust",
+    deception: "Deception",
+    nist: "NIST",
+    privacy: "Gizlilik",
+    demo: "Operasyon özeti",
+  } as const;
 
   return (
     <div className="space-y-5">
       <Panel>
         <div className="grid gap-5 xl:grid-cols-[1.2fr,0.8fr]">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300/80">Presentation Mode</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300/80">Executive Briefing</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
-              Hibrit Bulut Ortamında Veri Depolama ve Yönetimi İçin Aktif Savunma Tabanlı Güvenlik Mimarisi
+              Hibrit Bulut Güvenlik Duruşu ve Aktif Savunma Görünümü
             </h1>
             <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">
               Problem: hibrit bulutta veri depolama ve yönetim süreçleri; yanlış yapılandırma, kimlik hırsızlığı, API suistimali, üçüncü taraf riski ve mevzuat yükümlülükleri nedeniyle dağınık bir risk yüzeyi oluşturur.
             </p>
             <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
-              Çözüm: veri sınıflandırma, Zero Trust karar motoru, deception storage, SIEM/SOAR olay yönetimi ve NIST CSF tabanlı uyumluluk katmanını tek ürünleştirilmiş konsolda birleştirmek.
+              Çözüm: veri sınıflandırma, Zero Trust karar motoru, deception storage, SIEM/SOAR olay yönetimi ve NIST CSF tabanlı uyumluluk katmanını tek konsolda birleştirmek.
             </p>
           </div>
           <div className="grid gap-3">
@@ -31,7 +40,7 @@ export function PresentationView() {
               "Önce / Sonra güvenlik durumu görünürlüğü",
               "NIST CSF 2.0 fonksiyon eşleşmesi",
               "MITRE Engage tabanlı deception akışı",
-              "Tez katkısının çalışan prototipe dönüşmesi",
+              "Operasyonel görünürlüğün yönetime aktarılması",
             ].map((item) => (
               <div key={item} className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-6 text-[var(--text-secondary)]">
                 {item}
@@ -58,19 +67,19 @@ export function PresentationView() {
         </Panel>
 
         <Panel>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Demo senaryo akışı</h2>
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Operasyon akışı</h2>
           <div className="mt-5 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5">
             <p className="font-semibold text-[var(--text-primary)]">{current?.title}</p>
             <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{current?.description}</p>
             <div className="mt-5 flex gap-2">
               <Button variant="secondary" onClick={previousDemoStep}>Geri</Button>
-              <Button variant="secondary" onClick={startDemoScenario}>Sunumu Başlat</Button>
+              <Button variant="secondary" onClick={startDemoScenario}>Briefing’i Başlat</Button>
               <Button onClick={nextDemoStep}>İleri</Button>
             </div>
           </div>
           {lastSimulationResult ? (
             <div className="mt-4 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
-              <p className="font-semibold text-[var(--text-primary)]">Gerçek demo sonucu</p>
+              <p className="font-semibold text-[var(--text-primary)]">Son çalıştırma sonucu</p>
               <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">{lastSimulationResult.summary}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge label={`Uyumluluk ${complianceScores.overallScore}%`} tone="compliance" />
@@ -115,7 +124,7 @@ export function PresentationView() {
             <div className="mt-5 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-semibold text-[var(--text-primary)]">{latestDemoReport.title}</p>
-                <Badge label={latestDemoReport.type} tone="deception" />
+                <Badge label={reportLabelMap[latestDemoReport.type]} tone="deception" />
               </div>
               <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{latestDemoReport.summary}</p>
               <p className="mt-3 text-xs text-[var(--text-muted)]">

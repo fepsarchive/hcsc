@@ -11,11 +11,11 @@ const labels: Record<string, string> = {
   events: "Event Center",
   compliance: "Uyumluluk",
   "threat-matrix": "Threat Matrix",
-  simulations: "Simülasyonlar",
+  simulations: "Senaryolar",
   "cloud-map": "Cloud Map",
   reports: "Raporlar",
-  presentation: "Presentation Mode",
-  "final-checklist": "Final Checklist",
+  presentation: "Executive Briefing",
+  "final-checklist": "Platform Status",
 };
 
 export function Breadcrumbs() {

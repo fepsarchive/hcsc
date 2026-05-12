@@ -1,6 +1,6 @@
 # HCSC v2 Foundation
 
-Hybrid Cloud Security Console (HCSC), **“Hibrit Bulut Ortamında Veri Depolama ve Yönetimi İçin Aktif Savunma Tabanlı Güvenlik Mimarisi Tasarımı”** başlıklı bitirme tezinin ürünleşebilir SaaS foundation sürümüdür.
+Hybrid Cloud Security Console (HCSC), hibrit bulut güvenliği için tasarlanmış çok kiracılı, API-first ve aktif savunma odaklı bir güvenlik operasyon platformudur.
 
 HCSC v2 foundation:
 
@@ -34,7 +34,7 @@ npm run prisma:generate
 npx prisma migrate dev --name init
 ```
 
-6. Demo veriyi yükle:
+6. Başlangıç verisini yükle:
 
 ```bash
 npm run db:seed
@@ -46,7 +46,7 @@ npm run db:seed
 npm run dev
 ```
 
-## Demo kullanıcılar
+## Hazır erişim hesapları
 
 - `security.admin@hcsc.local`
 - `analyst@hcsc.local`
@@ -60,7 +60,7 @@ Parola:
 demo123
 ```
 
-2FA demo kodu:
+2FA doğrulama kodu:
 
 ```txt
 123456
@@ -71,21 +71,21 @@ demo123
 Frontend store korunur, ancak primary source backend API’dir.
 
 - API başarılıysa state DB’den hydrate olur
-- API başarısızsa kontrollü mock fallback korunur
+- API başarısızsa kontrollü yerel fallback korunur
 - organization scope client değil backend session context ile çözülür
 
 ## Backend engine’ler
 
 - Risk Engine: asset risk skorunu policy + event + deception sinyaline göre hesaplar
 - Zero Trust Engine: access request kararını server-side üretir
-- Deception Engine: güvenli deception simülasyonu ve trap olaylarını üretir
+- Deception Engine: güvenli deception akışı ve trap olaylarını üretir
 - Event / SOAR Engine: playbook, timeline, containment ve audit akışını yönetir
 - Compliance Engine: NIST CSF 2.0 / KVKK / GDPR / ISO 27001 görünümünü hesaplar
 - Report Engine: kalıcı snapshot tabanlı rapor üretir
 
-## Executive demo
+## Guided run
 
-`/dashboard` veya `/simulations` üzerinden **Demo Senaryosu Başlat** aksiyonu çalıştırıldığında:
+`/dashboard` veya `/simulations` üzerinden **Guided Run Başlat** aksiyonu çalıştırıldığında:
 
 1. access request oluşturulur
 2. Zero Trust kararı üretilir
