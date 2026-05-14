@@ -19,14 +19,18 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const submittedEmail = String(formData.get("email") ?? "")
+      .trim()
+      .toLowerCase();
 
-    if (!email.trim()) {
+    if (!submittedEmail) {
       setError("Lütfen e-posta adresini gir.");
       return;
     }
 
     setIsSubmitting(true);
-    const result = await requestPasswordReset(email);
+    const result = await requestPasswordReset(submittedEmail);
     setIsSubmitting(false);
 
     if (!result.success) {
@@ -57,6 +61,7 @@ export default function ForgotPasswordPage() {
             <Label htmlFor="forgot-email">E-posta adresi</Label>
             <Input
               id="forgot-email"
+              name="email"
               type="email"
               value={email}
               onChange={(event) => {
@@ -64,7 +69,11 @@ export default function ForgotPasswordPage() {
                 setError(null);
                 setSuccess(null);
               }}
-              placeholder="security.admin@hcsc.local"
+              placeholder="name@company.com"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="h-11 rounded-xl px-3.5"
             />
           </div>
