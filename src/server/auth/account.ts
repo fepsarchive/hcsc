@@ -7,6 +7,7 @@ import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/perm
 import { hashPassword } from "@/server/auth/password";
 import { createAuthAuditLog, createPendingSession } from "@/server/auth/session";
 import { createTwoFactorEnrollmentSecret } from "@/server/auth/two-factor";
+import { sendPasswordResetMail } from "@/server/mail/resend-mailer";
 import { recalculateAndPersistCompliance } from "@/server/services/compliance/compliance-service";
 import { createNotification, notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
 import { generateOrganizationReport } from "@/server/services/reports/reports-service";
@@ -43,6 +44,28 @@ async function createUniqueOrganizationSlug(name: string) {
 
 function hashOpaqueToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function maskEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  const [localPart = "", domainPart = ""] = normalized.split("@");
+
+  if (!domainPart) {
+    return "***";
+  }
+
+  const visibleLocal =
+    localPart.length <= 2
+      ? `${localPart.charAt(0) || "*"}*`
+      : `${localPart.slice(0, 2)}***`;
+
+  const domainSegments = domainPart.split(".");
+  const domainName = domainSegments[0] ?? "";
+  const domainSuffix = domainSegments.slice(1).join(".");
+  const visibleDomain =
+    domainName.length <= 2 ? `${domainName.charAt(0) || "*"}*` : `${domainName.slice(0, 2)}***`;
+
+  return `${visibleLocal}@${visibleDomain}${domainSuffix ? `.${domainSuffix}` : ""}`;
 }
 
 async function provisionStarterWorkspace(organizationId: string) {
@@ -455,20 +478,56 @@ export async function createPasswordResetRequest(input: {
   appOrigin?: string | null;
 }) {
   const email = input.email.trim().toLowerCase();
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: {
-      memberships: {
-        include: {
-          organization: true,
-        },
-        orderBy: { createdAt: "asc" },
-        take: 1,
+  const maskedEmail = maskEmail(email);
+  const userInclude = {
+    twoFactorSecret: {
+      select: {
+        enabledAt: true,
       },
     },
+    memberships: {
+      include: {
+        organization: true,
+      },
+      orderBy: { createdAt: "asc" as const },
+      take: 1,
+    },
+  };
+
+  const exactUser = await prisma.user.findUnique({
+    where: { email },
+    include: userInclude,
+  });
+  const user =
+    exactUser ??
+    (await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: "insensitive",
+        },
+      },
+      include: userInclude,
+    }));
+  const membership = user?.memberships[0] ?? null;
+
+  console.info("[auth] password reset user lookup result", {
+    email: maskedEmail,
+    result: user ? (membership ? "found" : "missing_membership") : "not_found",
+    lookupMode: exactUser ? "exact" : user ? "case_insensitive_fallback" : "none",
+    userStatus: user?.status ?? null,
+    onboardingCompleted: membership?.organization.onboardingCompleted ?? null,
+    twoFactorEnabled: Boolean(user?.twoFactorSecret?.enabledAt ?? user?.mfaEnabled),
+    env: process.env.NODE_ENV,
   });
 
-  if (!user || !user.memberships[0]) {
+  if (!user || !membership) {
+    console.info("[auth] password reset token created", {
+      email: maskedEmail,
+      created: false,
+      env: process.env.NODE_ENV,
+    });
+
     return {
       success: true as const,
       message: "Eğer bu e-posta ile bir hesap varsa şifre sıfırlama bağlantısı gönderilecektir.",
@@ -497,8 +556,14 @@ export async function createPasswordResetRequest(input: {
     },
   });
 
+  console.info("[auth] password reset token created", {
+    email: maskedEmail,
+    created: true,
+    env: process.env.NODE_ENV,
+  });
+
   await createAuthAuditLog({
-    organizationId: user.memberships[0].organizationId,
+    organizationId: membership.organizationId,
     userId: user.id,
     actorName: user.name,
     actorRole: mapDbUserToAppUser(user).role,
@@ -512,7 +577,7 @@ export async function createPasswordResetRequest(input: {
   });
 
   await createNotification({
-    organizationId: user.memberships[0].organizationId,
+    organizationId: membership.organizationId,
     userId: user.id,
     title: "Şifre sıfırlama talebi",
     description: "Hesabın için yeni bir şifre sıfırlama talebi oluşturuldu.",
@@ -522,15 +587,42 @@ export async function createPasswordResetRequest(input: {
     actionHref: "/login",
   });
 
-  const resetUrl =
-    input.appOrigin && process.env.NODE_ENV !== "production"
-      ? `${input.appOrigin}/reset-password?token=${token}`
-      : null;
+  const appUrl = process.env.APP_URL?.trim();
+  const devOrigin = input.appOrigin?.trim();
+  const resetBaseUrl =
+    appUrl && appUrl.length > 0
+      ? appUrl.replace(/\/+$/, "")
+      : process.env.NODE_ENV !== "production" && devOrigin
+        ? devOrigin.replace(/\/+$/, "")
+        : null;
+
+  const resetUrl = resetBaseUrl ? `${resetBaseUrl}/reset-password?token=${token}` : null;
+
+  if (resetUrl) {
+    console.info("[auth] password reset email send attempted", {
+      email: maskedEmail,
+      hasResetBaseUrl: Boolean(resetBaseUrl),
+      env: process.env.NODE_ENV,
+    });
+
+    await sendPasswordResetMail({
+      to: user.email,
+      recipientName: user.name,
+      resetUrl,
+    });
+  } else {
+    console.warn("[auth] password reset email skipped", {
+      email: maskedEmail,
+      reason: "missing-app-url",
+      env: process.env.NODE_ENV,
+      hasAppUrl: Boolean(appUrl),
+    });
+  }
 
   return {
     success: true as const,
     message: "Eğer bu e-posta ile bir hesap varsa şifre sıfırlama bağlantısı gönderilecektir.",
-    resetUrl,
+    resetUrl: process.env.NODE_ENV !== "production" ? resetUrl : null,
   };
 }
 
