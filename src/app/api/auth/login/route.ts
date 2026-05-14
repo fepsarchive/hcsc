@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
 import { verifyPassword } from "@/server/auth/password";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { buildRequestMeta, createAuthAuditLog, createPendingSession, setSessionCookie } from "@/server/auth/session";
 import { isTwoFactorEnrolled } from "@/server/auth/two-factor";
 import { prisma } from "@/server/db/prisma";
@@ -33,14 +33,14 @@ export async function POST(request: NextRequest) {
   }
 
   const email = parsed.data.email.toLowerCase();
-  const rateLimit = consumeRateLimit({
-    key: `auth:login:${meta.ipAddress ?? "unknown"}:${email}`,
-    limit: 10,
-    windowMs: 1000 * 60 * 10,
+  const rateLimit = await consumeRateLimitPolicy("login", {
+    ipAddress: meta.ipAddress,
+    email,
   });
 
   if (!rateLimit.allowed) {
-    return NextResponse.json(
+    return applyRateLimitHeaders(
+      NextResponse.json(
       {
         data: null,
         meta: { requestId: meta.requestId, retryAfterSeconds: rateLimit.retryAfterSeconds },
@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
         },
       },
       { status: 429 },
+      ),
+      rateLimit,
     );
   }
 
@@ -103,7 +105,8 @@ export async function POST(request: NextRequest) {
       device: meta.userAgent,
     });
 
-    return NextResponse.json(
+    return applyRateLimitHeaders(
+      NextResponse.json(
       {
         data: null,
         meta: { requestId: meta.requestId },
@@ -113,6 +116,8 @@ export async function POST(request: NextRequest) {
         },
       },
       { status: 401 },
+      ),
+      rateLimit,
     );
   }
 
@@ -164,5 +169,5 @@ export async function POST(request: NextRequest) {
 
   setSessionCookie(response, rawToken);
 
-  return response;
+  return applyRateLimitHeaders(response, rateLimit);
 }

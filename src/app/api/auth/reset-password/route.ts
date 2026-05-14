@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { resetPasswordWithToken } from "@/server/auth/account";
 import { apiError, apiOk } from "@/server/api/response";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimitPolicy, createRateLimitTokenFingerprint } from "@/server/auth/rate-limit";
 import { buildRequestMeta } from "@/server/auth/session";
 
 const resetPasswordSchema = z
@@ -26,19 +26,21 @@ export async function POST(request: NextRequest) {
     return apiError(meta.requestId, 400, "VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Geçerli bir parola bekleniyor.");
   }
 
-  const rateLimit = consumeRateLimit({
-    key: `auth:reset-password:${meta.ipAddress ?? "unknown"}:${parsed.data.token.slice(0, 12)}`,
-    limit: 10,
-    windowMs: 1000 * 60 * 15,
+  const rateLimit = await consumeRateLimitPolicy("reset_password", {
+    ipAddress: meta.ipAddress,
+    tokenFingerprint: createRateLimitTokenFingerprint(parsed.data.token),
   });
 
   if (!rateLimit.allowed) {
-    return apiError(
-      meta.requestId,
-      429,
-      "RATE_LIMITED",
-      "Çok fazla parola yenileme denemesi yapıldı. Lütfen kısa süre sonra tekrar dene.",
-      { retryAfterSeconds: rateLimit.retryAfterSeconds },
+    return applyRateLimitHeaders(
+      apiError(
+        meta.requestId,
+        429,
+        "RATE_LIMITED",
+        "Çok fazla deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.",
+        { retryAfterSeconds: rateLimit.retryAfterSeconds },
+      ),
+      rateLimit,
     );
   }
 
@@ -50,11 +52,14 @@ export async function POST(request: NextRequest) {
   });
 
   if (!result.success) {
-    return apiError(meta.requestId, 400, result.code, result.message);
+    return applyRateLimitHeaders(apiError(meta.requestId, 400, result.code, result.message), rateLimit);
   }
 
-  return apiOk(meta.requestId, {
-    success: true,
-    message: "Parolan güvenli şekilde yenilendi. Yeni parolanla giriş yapabilirsin.",
-  });
+  return applyRateLimitHeaders(
+    apiOk(meta.requestId, {
+      success: true,
+      message: "Parolan güvenli şekilde yenilendi. Yeni parolanla giriş yapabilirsin.",
+    }),
+    rateLimit,
+  );
 }

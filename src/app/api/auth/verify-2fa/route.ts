@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
 import { consumeRecoveryCode } from "@/server/auth/recovery-codes";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { buildRequestMeta, createAuthAuditLog, getSessionContext, getSessionTokenFromRequest } from "@/server/auth/session";
 import { isReplayProtectedStep, isTwoFactorEnrolled, persistSuccessfulTwoFactorVerification, verifyTwoFactorCode } from "@/server/auth/two-factor";
 
@@ -61,11 +61,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const rateLimit = consumeRateLimit({
-    key: `auth:2fa:${meta.ipAddress ?? "unknown"}:${session.id}`,
-    limit: 5,
-    windowMs: 1000 * 60 * 10,
-  });
+  const rateLimit = await consumeRateLimitPolicy(
+    parsed.data.method === "recovery" ? "verify_2fa_recovery" : "verify_2fa",
+    {
+      ipAddress: meta.ipAddress,
+      sessionId: session.id,
+    }
+  );
 
   if (!rateLimit.allowed) {
     await createAuthAuditLog({
@@ -82,16 +84,19 @@ export async function POST(request: NextRequest) {
       device: meta.userAgent,
     });
 
-    return NextResponse.json(
-      {
-        data: null,
-        meta: { requestId: meta.requestId, retryAfterSeconds: rateLimit.retryAfterSeconds },
-        error: {
-          code: "RATE_LIMITED",
-          message: "Çok fazla 2FA denemesi yapıldı. Lütfen kısa süre sonra tekrar dene.",
+    return applyRateLimitHeaders(
+      NextResponse.json(
+        {
+          data: null,
+          meta: { requestId: meta.requestId, retryAfterSeconds: rateLimit.retryAfterSeconds },
+          error: {
+            code: "RATE_LIMITED",
+            message: "Çok fazla deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.",
+          },
         },
-      },
-      { status: 429 },
+        { status: 429 },
+      ),
+      rateLimit,
     );
   }
 
@@ -139,16 +144,19 @@ export async function POST(request: NextRequest) {
         device: meta.userAgent,
       });
 
-      return NextResponse.json(
-        {
-          data: null,
-          meta: { requestId: meta.requestId },
-          error: {
-            code: "INVALID_2FA_CODE",
-            message: "Doğrulama kodu hatalı veya süresi dolmuş.",
+      return applyRateLimitHeaders(
+        NextResponse.json(
+          {
+            data: null,
+            meta: { requestId: meta.requestId },
+            error: {
+              code: "INVALID_2FA_CODE",
+              message: "Doğrulama kodu hatalı veya süresi dolmuş.",
+            },
           },
-        },
-        { status: 401 },
+          { status: 401 },
+        ),
+        rateLimit,
       );
     }
 
@@ -172,33 +180,39 @@ export async function POST(request: NextRequest) {
       device: meta.userAgent,
     });
 
-    return NextResponse.json({
-      data: {
-        authenticated: true,
-        twoFactorVerified: true,
-        sessionStartedAt: updatedSession.createdAt.toISOString(),
-        user: mapDbUserToAppUser(updatedSession.user),
-        organization: mapOrganizationToProfile(updatedSession.organization),
-        onboardingCompleted: updatedSession.organization.onboardingCompleted,
-        twoFactorEnrolled: true,
-        nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
-      },
-      meta: { requestId: meta.requestId },
-      error: null,
-    });
+    return applyRateLimitHeaders(
+      NextResponse.json({
+        data: {
+          authenticated: true,
+          twoFactorVerified: true,
+          sessionStartedAt: updatedSession.createdAt.toISOString(),
+          user: mapDbUserToAppUser(updatedSession.user),
+          organization: mapOrganizationToProfile(updatedSession.organization),
+          onboardingCompleted: updatedSession.organization.onboardingCompleted,
+          twoFactorEnrolled: true,
+          nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
+        },
+        meta: { requestId: meta.requestId },
+        error: null,
+      }),
+      rateLimit,
+    );
   }
 
   if (!/^\d{6}$/.test(parsed.data.code)) {
-    return NextResponse.json(
-      {
-        data: null,
-        meta: { requestId: meta.requestId },
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "6 haneli doğrulama kodu bekleniyor.",
+    return applyRateLimitHeaders(
+      NextResponse.json(
+        {
+          data: null,
+          meta: { requestId: meta.requestId },
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "6 haneli doğrulama kodu bekleniyor.",
+          },
         },
-      },
-      { status: 400 },
+        { status: 400 },
+      ),
+      rateLimit,
     );
   }
 
@@ -222,16 +236,19 @@ export async function POST(request: NextRequest) {
       device: meta.userAgent,
     });
 
-    return NextResponse.json(
-      {
-        data: null,
-        meta: { requestId: meta.requestId },
-        error: {
-          code: "INVALID_2FA_CODE",
-          message: "Doğrulama kodu hatalı veya süresi dolmuş.",
+    return applyRateLimitHeaders(
+      NextResponse.json(
+        {
+          data: null,
+          meta: { requestId: meta.requestId },
+          error: {
+            code: "INVALID_2FA_CODE",
+            message: "Doğrulama kodu hatalı veya süresi dolmuş.",
+          },
         },
-      },
-      { status: 401 },
+        { status: 401 },
+      ),
+      rateLimit,
     );
   }
 
@@ -255,16 +272,19 @@ export async function POST(request: NextRequest) {
       device: meta.userAgent,
     });
 
-    return NextResponse.json(
-      {
-        data: null,
-        meta: { requestId: meta.requestId },
-        error: {
-          code: "INVALID_2FA_CODE",
-          message: "Doğrulama kodu hatalı veya süresi dolmuş.",
+    return applyRateLimitHeaders(
+      NextResponse.json(
+        {
+          data: null,
+          meta: { requestId: meta.requestId },
+          error: {
+            code: "INVALID_2FA_CODE",
+            message: "Doğrulama kodu hatalı veya süresi dolmuş.",
+          },
         },
-      },
-      { status: 401 },
+        { status: 401 },
+      ),
+      rateLimit,
     );
   }
 
@@ -289,18 +309,21 @@ export async function POST(request: NextRequest) {
     device: meta.userAgent,
   });
 
-  return NextResponse.json({
-    data: {
-      authenticated: true,
-      twoFactorVerified: true,
-      sessionStartedAt: updatedSession.createdAt.toISOString(),
-      user: mapDbUserToAppUser(updatedSession.user),
-      organization: mapOrganizationToProfile(updatedSession.organization),
-      onboardingCompleted: updatedSession.organization.onboardingCompleted,
-      twoFactorEnrolled: true,
-      nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
-    },
-    meta: { requestId: meta.requestId },
-    error: null,
-  });
+  return applyRateLimitHeaders(
+    NextResponse.json({
+      data: {
+        authenticated: true,
+        twoFactorVerified: true,
+        sessionStartedAt: updatedSession.createdAt.toISOString(),
+        user: mapDbUserToAppUser(updatedSession.user),
+        organization: mapOrganizationToProfile(updatedSession.organization),
+        onboardingCompleted: updatedSession.organization.onboardingCompleted,
+        twoFactorEnrolled: true,
+        nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
+      },
+      meta: { requestId: meta.requestId },
+      error: null,
+    }),
+    rateLimit,
+  );
 }

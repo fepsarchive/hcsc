@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { registerWorkspaceAccount } from "@/server/auth/account";
 import { apiCreated, apiError } from "@/server/api/response";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { buildRequestMeta, setSessionCookie } from "@/server/auth/session";
 
 const registerSchema = z.object({
@@ -22,19 +22,21 @@ export async function POST(request: NextRequest) {
     return apiError(meta.requestId, 400, "VALIDATION_ERROR", "Geçerli kayıt alanları bekleniyor.");
   }
 
-  const rateLimit = consumeRateLimit({
-    key: `auth:register:${meta.ipAddress ?? "unknown"}:${parsed.data.email.toLowerCase()}`,
-    limit: 5,
-    windowMs: 1000 * 60 * 15,
+  const rateLimit = await consumeRateLimitPolicy("register", {
+    ipAddress: meta.ipAddress,
+    email: parsed.data.email,
   });
 
   if (!rateLimit.allowed) {
-    return apiError(
-      meta.requestId,
-      429,
-      "RATE_LIMITED",
-      "Çok fazla kayıt denemesi yapıldı. Lütfen kısa süre sonra tekrar dene.",
-      { retryAfterSeconds: rateLimit.retryAfterSeconds },
+    return applyRateLimitHeaders(
+      apiError(
+        meta.requestId,
+        429,
+        "RATE_LIMITED",
+        "Çok fazla deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.",
+        { retryAfterSeconds: rateLimit.retryAfterSeconds },
+      ),
+      rateLimit,
     );
   }
 
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (!result.success) {
-    return apiError(meta.requestId, 409, result.code, result.message);
+    return applyRateLimitHeaders(apiError(meta.requestId, 409, result.code, result.message), rateLimit);
   }
 
   const response = apiCreated(meta.requestId, {
@@ -61,5 +63,5 @@ export async function POST(request: NextRequest) {
 
   setSessionCookie(response, result.rawToken);
 
-  return response;
+  return applyRateLimitHeaders(response, rateLimit);
 }
