@@ -233,7 +233,7 @@ export type SecurityConsoleStore = {
   login: (email: string, password: string) => Promise<AuthActionResult>;
   register: (payload: RegisterAccountPayload) => Promise<AuthActionResult>;
   requestPasswordReset: (email: string) => Promise<AuthActionResult>;
-  verify2FA: (code: string) => Promise<AuthActionResult>;
+  verify2FA: (code: string, method?: "totp" | "recovery") => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   completeOnboarding: (payload: OnboardingPayload) => Promise<boolean>;
   can: (permission: Permission) => boolean;
@@ -339,6 +339,9 @@ type AuthApiPayload = {
   user: AppUser | null;
   organization: OrganizationProfile | null;
   onboardingCompleted: boolean;
+  twoFactorEnrolled?: boolean;
+  recoveryCodes?: string[];
+  nextPath?: string;
   permissions?: Permission[];
 };
 
@@ -2253,7 +2256,7 @@ const actions: Pick<
     }
   },
 
-  async verify2FA(code) {
+  async verify2FA(code, method = "totp") {
     if (currentMeta.auth.isAuthenticated) {
       try {
         const response = await fetch("/api/auth/verify-2fa", {
@@ -2262,7 +2265,7 @@ const actions: Pick<
             "Content-Type": "application/json",
           },
           credentials: "include",
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, method }),
         });
         const result = await parseAuthApiResponse(response);
 
@@ -2310,6 +2313,13 @@ const actions: Pick<
       } catch {
         // Fall back to existing mock flow if the API is unavailable.
       }
+    }
+
+    if (method === "recovery") {
+      return {
+        success: false,
+        error: "Recovery code doğrulaması için sunucu bağlantısı gerekli.",
+      };
     }
 
     const currentUser =

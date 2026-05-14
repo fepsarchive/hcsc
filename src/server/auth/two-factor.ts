@@ -374,11 +374,20 @@ export async function persistSuccessfulTwoFactorVerification(input: {
         lastSeenAt: now,
       },
       include: {
-        user: {
-          include: {
-            twoFactorSecret: true,
+      user: {
+        include: {
+          twoFactorSecret: true,
+          recoveryCodes: {
+            where: {
+              usedAt: null,
+            },
+            select: {
+              id: true,
+              createdAt: true,
+            },
           },
         },
+      },
         organization: true,
       },
     });

@@ -69,8 +69,11 @@ export type AuthUserPayload = {
   organization: OrganizationProfile | null;
   onboardingCompleted: boolean;
   twoFactorEnrolled?: boolean;
+  recoveryCodes?: string[];
   nextPath?: string;
 };
+
+export type VerifyTwoFactorMethod = "totp" | "recovery";
 
 export type TwoFactorSetupPayload =
   | {
@@ -94,6 +97,14 @@ export type RegisterAccountPayload = {
 
 export type ForgotPasswordResponse = {
   message: string;
+};
+
+export type RecoveryCodeStatusPayload = {
+  totalCodes: number;
+  remainingCodes: number;
+  usedCodes: number;
+  lastGeneratedAt: string | null;
+  hasRecoveryCodes: boolean;
 };
 
 export type ResetPasswordPayload = {
@@ -362,6 +373,28 @@ export function confirmTwoFactorSetup(code: string) {
   return request<AuthUserPayload>("/api/auth/2fa/confirm", {
     method: "POST",
     body: { code },
+  });
+}
+
+export function verifyTwoFactor(code: string, method: VerifyTwoFactorMethod = "totp") {
+  return request<AuthUserPayload>("/api/auth/verify-2fa", {
+    method: "POST",
+    body: { code, method },
+  });
+}
+
+export function getRecoveryCodeStatus() {
+  return request<RecoveryCodeStatusPayload>("/api/auth/recovery-codes/status", {
+    method: "GET",
+  });
+}
+
+export function regenerateRecoveryCodes() {
+  return request<{
+    recoveryCodes: string[];
+    status: RecoveryCodeStatusPayload;
+  }>("/api/auth/recovery-codes/regenerate", {
+    method: "POST",
   });
 }
 
