@@ -41,7 +41,7 @@ export function ComplianceView() {
         </div>
         {lastSimulationResult ? (
           <div className="mt-4 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Son simülasyon etkisi</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Son çalışma etkisi</p>
             <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">{lastSimulationResult.summary}</p>
           </div>
         ) : null}

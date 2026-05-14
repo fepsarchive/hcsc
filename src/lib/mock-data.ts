@@ -2057,8 +2057,8 @@ const demoSteps = [
   },
   {
     id: "demo-10",
-    title: "Demo olay raporu oluşur",
-    description: "Reports sayfasında Demo Olay Raporu oluşturulur.",
+    title: "Operasyon olay raporu oluşur",
+    description: "Reports sayfasında operasyon akışını özetleyen olay raporu oluşturulur.",
     status: "pending" as const,
   },
 ];

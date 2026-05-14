@@ -103,7 +103,7 @@ function createReport(environment: ReportEnvironment, type: ReportType): ReportI
         type,
         summary: `NIST CSF genel skoru ${environment.compliance.overallScore}% seviyesinde hesaplandı.`,
         findings: environment.compliance.nist.map((item) => `${item.name}: ${item.score}%`),
-        risks: ["Detect coverage boşlukları", "Respond entegrasyonlarının mock seviyede olması"],
+        risks: ["Detect coverage boşlukları", "Respond entegrasyonlarının hazırlık seviyesinde olması"],
         recommendedActions: ["Streaming telemetry ekle", "Playbook aksiyonlarını gerçek API entegrasyonlarına hazırla", "Govern fonksiyonunda policy approval akışı ekle"],
         relatedEventIds: collectRelatedEventIds(environment, (event) =>
           ["visibility_gap", "deception_triggered", "policy_violation"].includes(event.category),
@@ -133,14 +133,14 @@ function createReport(environment: ReportEnvironment, type: ReportType): ReportI
     default:
       return {
         ...common,
-        title: "Demo Senaryo Raporu",
+        title: "Operasyon Özet Raporu",
         type: "demo",
         summary: latestRun
-          ? `Son demo akışı: ${latestRun.summary}`
-          : "Demo akışı henüz çalıştırılmadı.",
+          ? `Son çalışma özeti: ${latestRun.summary}`
+          : "Henüz çalıştırılmış bir operasyon özeti bulunmuyor.",
         findings: environment.demoScenario.steps.map((step, index) => `${index + 1}. ${step.title}`),
         risks: ["Kritik veri export", "Deception access", "SOAR containment gereksinimi"],
-        recommendedActions: ["Presentation Mode üzerinden adımları sırayla göster", "Demo öncesi reports görünümünü yenile", "Compliance etkisini Respond/Detect kartlarında vurgula"],
+        recommendedActions: ["Executive Briefing görünümünde adımları sırayla paylaş", "Raporları güncelleyerek son bulguları yansıt", "Compliance etkisini Respond ve Detect kartlarında vurgula"],
         relatedEventIds: latestRun?.generatedEventIds ?? [],
         relatedAssetIds: [],
         relatedControls: ["Zero Trust", "Deception", "SOAR", "Compliance"],

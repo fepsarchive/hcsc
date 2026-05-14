@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getPermissionsForRole, mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
 import { buildRequestMeta, getSessionContext, getSessionTokenFromRequest } from "@/server/auth/session";
+import { isTwoFactorEnrolled } from "@/server/auth/two-factor";
 
 export async function GET(request: NextRequest) {
   const meta = buildRequestMeta(request);
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
         user: null,
         organization: null,
         onboardingCompleted: false,
+        twoFactorEnrolled: false,
         permissions: [],
       },
       meta: { requestId: meta.requestId },
@@ -31,6 +33,11 @@ export async function GET(request: NextRequest) {
       user: mapDbUserToAppUser(session.user),
       organization: mapOrganizationToProfile(session.organization),
       onboardingCompleted: session.organization.onboardingCompleted,
+      twoFactorEnrolled: isTwoFactorEnrolled({
+        secret: session.user.twoFactorSecret?.secret,
+        enabledAt: session.user.twoFactorSecret?.enabledAt,
+        enrolledAt: session.user.twoFactorSecret?.enrolledAt,
+      }),
       permissions: getPermissionsForRole(session.user.role),
     },
     meta: { requestId: meta.requestId },

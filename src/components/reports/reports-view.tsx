@@ -22,6 +22,16 @@ const reportToneMap = {
   demo: "deception",
 } as const;
 
+const reportLabelMap = {
+  general: "Genel",
+  "critical-data": "Kritik veri",
+  "zero-trust": "Zero Trust",
+  deception: "Deception",
+  nist: "NIST",
+  privacy: "Gizlilik",
+  demo: "Operasyon özeti",
+} as const;
+
 export function ReportsView() {
   const router = useRouter();
   const { environment, generateReport, lastSimulationResult } = useDemo();
@@ -38,7 +48,7 @@ export function ReportsView() {
         <PageIntro
           eyebrow="Reporting"
           title="Raporlar"
-          description="Bu sayfa, tez sunumu için güvenlik, Zero Trust, deception, NIST CSF 2.0 ve KVKK/GDPR perspektiflerini rapor kartları ve detay drawer yapısıyla sunar."
+          description="Bu sayfa, güvenlik duruşunu, Zero Trust kararlarını, deception sinyallerini ve KVKK/GDPR etkilerini rapor kartları ve ayrıntı görünümüyle bir araya getirir."
           action={{ label: "Raporları yenile", onClick: () => generateReport() }}
         />
       </Panel>
@@ -47,7 +57,7 @@ export function ReportsView() {
         <Panel>
           <EmptyState
             title="Henüz rapor üretilmedi"
-            description="Demo senaryosu çalıştırarak veya raporları yenileyerek güvenlik konsolu için yeni çıktı üretebilirsin."
+            description="Operasyon akışını çalıştırarak veya raporları yenileyerek yeni görünürlük çıktıları oluşturabilirsin."
             primaryAction={<ActionButton onClick={() => generateReport()}>Raporları oluştur</ActionButton>}
           />
         </Panel>
@@ -61,7 +71,7 @@ export function ReportsView() {
                     <p className="text-balance text-[15px] font-semibold text-[var(--text-primary)]">{report.title}</p>
                     <p className="mt-2 text-sm text-[var(--text-muted)]">{formatDateTime(report.createdAt)}</p>
                   </div>
-                  <Badge label={report.type} tone={reportToneMap[report.type]} />
+                  <Badge label={reportLabelMap[report.type]} tone={reportToneMap[report.type]} />
                 </div>
 
                 <p className="mt-5 line-clamp-3 text-sm leading-7 text-[var(--text-secondary)]">{report.summary}</p>
@@ -75,10 +85,10 @@ export function ReportsView() {
                   Yeniden üret
                 </ActionButton>
                 <ActionButton variant="ghost" onClick={() => copyText(report.summary)}>
-                  Copy Summary
+                  Özeti kopyala
                 </ActionButton>
                 <ActionButton variant="ghost" onClick={() => copyText(buildReportMarkdown(report, environment))}>
-                  Copy Markdown
+                  Markdown kopyala
                 </ActionButton>
               </div>
             </Panel>
@@ -91,16 +101,16 @@ export function ReportsView() {
         onClose={() => setSelectedId(null)}
         title={selected?.title ?? "Rapor detayı"}
         subtitle={selected ? formatDateTime(selected.createdAt) : undefined}
-        badge={selected ? <Badge label={selected.type} tone={reportToneMap[selected.type]} /> : undefined}
+        badge={selected ? <Badge label={reportLabelMap[selected.type]} tone={reportToneMap[selected.type]} /> : undefined}
       >
         {selected ? (
           <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
               <ActionButton variant="secondary" onClick={() => copyText(selected.summary)}>
-                Copy Summary
+                Özeti kopyala
               </ActionButton>
               <ActionButton variant="secondary" onClick={() => copyText(buildReportMarkdown(selected, environment))}>
-                Copy Markdown
+                Markdown kopyala
               </ActionButton>
               <ActionButton onClick={() => router.push(`/reports/${selected.id}/print`)}>Yazdır / PDF</ActionButton>
             </div>
@@ -112,18 +122,18 @@ export function ReportsView() {
 
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Related Events</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">İlgili olaylar</p>
                 <p className="mt-2 font-medium text-[var(--text-primary)]">{selected.relatedEventIds.length}</p>
               </div>
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Controls</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Kontroller</p>
                 <p className="mt-2 font-medium text-[var(--text-primary)]">{selected.relatedControls.length}</p>
               </div>
             </div>
 
             {lastSimulationResult && selected.type === "demo" ? (
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">Son demo akışı</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Son çalışma özeti</p>
                 <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{lastSimulationResult.summary}</p>
               </div>
             ) : null}

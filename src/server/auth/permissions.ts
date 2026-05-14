@@ -54,10 +54,15 @@ export function mapDbUserToAppUser(user: Pick<User, "id" | "name" | "email" | "r
 export function mapOrganizationToProfile(
   organization: Pick<Organization, "id" | "name" | "plan" | "region" | "cloudMode" | "demoMode" | "complianceFrameworks">,
 ): OrganizationProfile {
+  const normalizedPlan =
+    organization.plan === "Thesis Prototype / Enterprise Simulation"
+      ? "Enterprise Security Workspace"
+      : organization.plan;
+
   return {
     id: organization.id,
     name: organization.name,
-    plan: organization.plan,
+    plan: normalizedPlan,
     region: organization.region,
     complianceFrameworks: Array.isArray(organization.complianceFrameworks)
       ? organization.complianceFrameworks.map((entry) => String(entry))

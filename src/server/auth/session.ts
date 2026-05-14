@@ -42,12 +42,15 @@ export async function createPendingSession(input: {
   organizationId: string;
   ipAddress?: string | null;
   userAgent?: string | null;
+  client?: Pick<typeof prisma, "session">;
+  rawToken?: string;
 }) {
-  const rawToken = randomBytes(32).toString("hex");
+  const rawToken = input.rawToken ?? randomBytes(32).toString("hex");
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+  const client = input.client ?? prisma;
 
-  const session = await prisma.session.create({
+  const session = await client.session.create({
     data: {
       userId: input.userId,
       organizationId: input.organizationId,
@@ -112,6 +115,14 @@ export async function markSessionTwoFactorVerified(sessionId: string) {
       status: "active",
       is2FAVerified: true,
       lastSeenAt: new Date(),
+    },
+    include: {
+      user: {
+        include: {
+          twoFactorSecret: true,
+        },
+      },
+      organization: true,
     },
   });
 }

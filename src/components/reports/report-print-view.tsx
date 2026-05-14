@@ -19,6 +19,16 @@ const reportToneMap = {
   demo: "deception",
 } as const;
 
+const reportTypeLabelMap = {
+  general: "Genel",
+  critical_data: "Kritik veri",
+  zero_trust: "Zero Trust",
+  deception: "Deception",
+  nist: "NIST",
+  privacy: "Gizlilik",
+  demo: "Operasyon özeti",
+} as const;
+
 export function ReportPrintView({ reportId }: { reportId: string }) {
   const router = useRouter();
   const [payload, setPayload] = useState<ReportPrintPayload | null>(null);
@@ -124,7 +134,7 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
           <p className="mt-3 text-sm text-slate-600">{error}</p>
           <div className="mt-6 flex gap-2">
             <Button variant="outline" onClick={() => router.push("/reports")}>
-              Reports sayfasına dön
+              Raporlar sayfasına dön
             </Button>
             <Button onClick={() => void loadPayload()}>Tekrar dene</Button>
           </div>
@@ -140,7 +150,7 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
           <h1 className="text-2xl font-semibold">Rapor bulunamadı</h1>
           <p className="mt-3 text-sm text-slate-600">İstenen rapor için veritabanında yazdırılabilir snapshot bulunamadı.</p>
           <Button className="mt-6" variant="outline" onClick={() => router.push("/reports")}>
-            Reports sayfasına dön
+            Raporlar sayfasına dön
           </Button>
         </div>
       </main>
@@ -152,8 +162,8 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
       <div className="mx-auto flex w-full max-w-[210mm] flex-col overflow-hidden rounded-[28px] border border-slate-200/90 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.1)] print:min-h-[297mm] print:max-w-none print:rounded-none print:border-0 print:shadow-none">
         <div className="print:hidden flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Professional Print Template</p>
-            <p className="mt-1 text-sm text-slate-600">A4 uyumlu HCSC v2 rapor çıktısı</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Printable Report View</p>
+            <p className="mt-1 text-sm text-slate-600">A4 uyumlu profesyonel güvenlik raporu</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => router.push("/reports")}>
@@ -196,7 +206,10 @@ export function ReportPrintView({ reportId }: { reportId: string }) {
                 label="Compliance"
                 value={payload.kvkkGdprImpact.kvkkScore !== null ? `${payload.kvkkGdprImpact.kvkkScore}% / ${payload.kvkkGdprImpact.gdprScore ?? 0}%` : "N/A"}
               />
-              <SnapshotCard label="Report Type" value={payload.report.type} />
+              <SnapshotCard
+                label="Report Type"
+                value={reportTypeLabelMap[payload.report.type as keyof typeof reportTypeLabelMap] ?? payload.report.type}
+              />
             </section>
 
             <Section title="Executive Summary" compact>

@@ -247,6 +247,7 @@ model User {
   sessions        Session[]
   twoFactorSecret TwoFactorSecret?
   recoveryCodes   RecoveryCode[]
+  passwordResetTokens PasswordResetToken[]
   auditLogs       AuditLog[]
   notifications   Notification[]
 }
@@ -293,6 +294,9 @@ model TwoFactorSecret {
   issuer    String
   label     String
   enabledAt DateTime?
+  enrolledAt DateTime?
+  lastVerifiedAt DateTime?
+  lastVerifiedStep Int?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -310,6 +314,21 @@ model RecoveryCode {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, usedAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
 }
 
 model Asset {
@@ -661,6 +680,9 @@ model OrganizationSettings {
   region               String
   cloudMode            CloudMode
   complianceFrameworks Json
+  usageType            String?
+  defaultCurrency      String?
+  setupCompletedAt     DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

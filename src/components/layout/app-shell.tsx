@@ -10,7 +10,8 @@ import { useDemo } from "@/components/layout/demo-provider"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
-const publicRoutes = new Set(["/login", "/verify-2fa", "/onboarding"])
+const publicRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password", "/verify-2fa", "/onboarding"])
+const anonymousAccessibleRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password"])
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -18,14 +19,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { auth, onboardingCompleted, isHydrating, apiError, isApiMode, lastSyncedAt } = useDemo()
   const contentScrollRef = useRef<HTMLDivElement | null>(null)
   const isPublicRoute = publicRoutes.has(pathname)
-  const isScrollablePublicRoute = pathname === "/onboarding"
+  const isAlwaysAccessiblePublicRoute =
+    pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password"
+  const isScrollablePublicRoute =
+    pathname === "/onboarding" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname === "/login" ||
+    pathname === "/verify-2fa"
   const isPrintRoute = pathname.startsWith("/reports/") && pathname.endsWith("/print")
 
   const redirectTarget = useMemo(() => {
     if (!auth.hydrated) return null
 
     if (!auth.isAuthenticated) {
-      return isPublicRoute && pathname === "/login" ? null : "/login"
+      return anonymousAccessibleRoutes.has(pathname) ? null : "/login"
     }
 
     if (!auth.is2FAVerified) {
@@ -36,12 +45,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return pathname === "/onboarding" ? null : "/onboarding"
     }
 
-    if (isPublicRoute) {
+    if (isPublicRoute && !isAlwaysAccessiblePublicRoute) {
       return "/dashboard"
     }
 
     return null
-  }, [auth.hydrated, auth.isAuthenticated, auth.is2FAVerified, isPublicRoute, onboardingCompleted, pathname])
+  }, [auth.hydrated, auth.isAuthenticated, auth.is2FAVerified, isAlwaysAccessiblePublicRoute, isPublicRoute, onboardingCompleted, pathname])
 
   useEffect(() => {
     if (!redirectTarget || pathname === redirectTarget) return

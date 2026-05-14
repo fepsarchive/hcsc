@@ -1,9 +1,14 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const DEMO_PASSWORD = "demo123";
+const ALLOW_DEVELOPMENT_DEMO_PASSWORD = process.env.NODE_ENV !== "production";
 
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function scryptHash(password: string, salt: string) {
+  return scryptSync(password, salt, 64).toString("hex");
 }
 
 function safeEqual(left: string, right: string) {
@@ -22,7 +27,10 @@ export function verifyPassword(password: string, passwordHash: string) {
     return false;
   }
 
-  if (passwordHash === "demo-password-hash" || passwordHash.startsWith("demo-password-hash-")) {
+  if (
+    ALLOW_DEVELOPMENT_DEMO_PASSWORD &&
+    (passwordHash === "demo-password-hash" || passwordHash.startsWith("demo-password-hash-"))
+  ) {
     return safeEqual(password, DEMO_PASSWORD);
   }
 
@@ -31,5 +39,20 @@ export function verifyPassword(password: string, passwordHash: string) {
     return safeEqual(sha256(password), expectedHash);
   }
 
+  if (passwordHash.startsWith("scrypt$")) {
+    const [, salt, expectedHash] = passwordHash.split("$");
+
+    if (!salt || !expectedHash) {
+      return false;
+    }
+
+    return safeEqual(scryptHash(password, salt), expectedHash);
+  }
+
   return false;
+}
+
+export function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  return `scrypt$${salt}$${scryptHash(password, salt)}`;
 }

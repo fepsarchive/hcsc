@@ -7,6 +7,7 @@ import {
   BellIcon,
   ChevronDownIcon,
   FileTextIcon,
+  HelpCircleIcon,
   LogOutIcon,
   MoonStarIcon,
   PlayIcon,
@@ -38,11 +39,11 @@ import { cn } from "@/lib/utils"
 const pageMeta: Record<string, { title: string; description: string }> = {
   "/": {
     title: "Dashboard",
-    description: "Genel güvenlik, risk ve demo akışı görünümü",
+    description: "Genel güvenlik, risk ve operasyon görünümü",
   },
   "/dashboard": {
     title: "Dashboard",
-    description: "Genel güvenlik, risk ve demo akışı görünümü",
+    description: "Genel güvenlik, risk ve operasyon görünümü",
   },
   "/cloud-map": {
     title: "Cloud Map",
@@ -62,7 +63,7 @@ const pageMeta: Record<string, { title: string; description: string }> = {
   },
   "/deception": {
     title: "Deception",
-    description: "Sahte depolama alanları ve active defense görünümü",
+    description: "Deception varlıkları ve aktif savunma görünümü",
   },
   "/events": {
     title: "Events",
@@ -81,16 +82,16 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     description: "Raporlar ve çıktı katmanı",
   },
   "/simulations": {
-    title: "Simulations",
-    description: "Demo ve tehdit senaryoları",
+    title: "Scenarios",
+    description: "Operasyon ve tehdit senaryoları",
   },
   "/presentation": {
-    title: "Presentation Mode",
-    description: "Tez savunması için akış odaklı görünüm",
+    title: "Executive Briefing",
+    description: "Yönetici odaklı özet ve operasyon hikayesi",
   },
   "/final-checklist": {
-    title: "Final Checklist",
-    description: "Teslim ve savunma gereksinim kontrolü",
+    title: "Platform Status",
+    description: "Platform yetkinlikleri ve operasyon hazırlığı",
   },
   "/settings": {
     title: "Settings",
@@ -149,7 +150,7 @@ export function SiteHeader() {
   const unreadNotifications = notifications.filter((item) => !item.read).length
 
   return (
-    <header className="sticky top-0 z-20 flex h-(--header-height) shrink-0 items-center border-b bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-40 flex h-(--header-height) shrink-0 items-center border-b bg-background/95 backdrop-blur">
       <div className="flex w-full items-center gap-3 px-4 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="data-[orientation=vertical]:h-4" />
@@ -201,10 +202,13 @@ export function SiteHeader() {
           ) : null}
         </div>
 
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon-sm" className="lg:hidden" onClick={toggleTheme} aria-label="Tema değiştir">
+            {theme === "dark" ? <SunMediumIcon /> : <MoonStarIcon />}
+          </Button>
           <Badge variant="outline">Score {dashboard.securityScore}</Badge>
           <Badge variant="outline">Critical {environment.events.filter((event) => event.severity === "critical").length}</Badge>
-          <Button variant="outline" size="sm" onClick={toggleTheme}>
+          <Button variant="outline" size="sm" onClick={toggleTheme} className="hidden lg:inline-flex">
             {theme === "dark" ? <SunMediumIcon /> : <MoonStarIcon />}
             {theme === "dark" ? "Light" : "Dark"}
           </Button>
@@ -213,9 +217,10 @@ export function SiteHeader() {
             onClick={() => void runExecutiveDemo()}
             disabled={!can("run_simulation")}
             title={!can("run_simulation") ? "Bu aksiyon için uygun rol gerekir." : undefined}
+            className="hidden lg:inline-flex"
           >
             <PlayIcon />
-            Executive Demo
+            Guided Run
           </Button>
           <Button
             variant="outline"
@@ -238,7 +243,7 @@ export function SiteHeader() {
                 ) : null}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-96">
+            <DropdownMenuContent align="end" className="z-[70] w-96">
               <DropdownMenuLabel className="flex items-center justify-between gap-2">
                 <span>Notification Center</span>
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void markAllNotificationsRead()}>
@@ -299,7 +304,7 @@ export function SiteHeader() {
                 <ChevronDownIcon className="size-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
+            <DropdownMenuContent align="end" className="z-[70] w-72">
               <DropdownMenuLabel>
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-foreground">{currentUser?.name}</p>
@@ -312,9 +317,17 @@ export function SiteHeader() {
                 <UserCircle2Icon />
                 Profil ve ayarlar
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleTheme}>
+                {theme === "dark" ? <SunMediumIcon /> : <MoonStarIcon />}
+                Tema değiştir
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/verify-2fa")}>
                 <ShieldCheckIcon />
                 Güvenlik doğrulaması
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
+                <HelpCircleIcon />
+                Destek ve yapılandırma
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

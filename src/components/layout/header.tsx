@@ -13,12 +13,12 @@ import { StatusBadge } from "@/components/ui/status-badge";
 const pageMeta: Record<string, { title: string; description: string; primaryAction: string }> = {
   "/": {
     title: "Dashboard",
-    description: "Genel güvenlik, risk ve demo akışı görünümü",
+    description: "Genel güvenlik, risk ve operasyon akışı görünümü",
     primaryAction: "Yeni görünüm",
   },
   "/dashboard": {
     title: "Dashboard",
-    description: "Genel güvenlik, risk ve demo akışı görünümü",
+    description: "Genel güvenlik, risk ve operasyon akışı görünümü",
     primaryAction: "Yeni görünüm",
   },
   "/cloud-map": {
@@ -43,7 +43,7 @@ const pageMeta: Record<string, { title: string; description: string; primaryActi
   },
   "/deception": {
     title: "Deception",
-    description: "Sahte depolama alanları ve active defense görünümü",
+    description: "Sahte depolama alanları ve aktif savunma görünümü",
     primaryAction: "Yeni trap",
   },
   "/events": {
@@ -68,25 +68,25 @@ const pageMeta: Record<string, { title: string; description: string; primaryActi
   },
   "/simulations": {
     title: "Simulations",
-    description: "Demo ve tehdit senaryoları",
-    primaryAction: "Yeni simülasyon",
+    description: "Operasyon ve tehdit senaryoları",
+    primaryAction: "Yeni senaryo",
   },
   "/presentation": {
-    title: "Presentation Mode",
-    description: "Tez savunması için akış odaklı görünüm",
-    primaryAction: "Sunumu başlat",
+    title: "Executive Briefing",
+    description: "Yönetim için akış odaklı görünüm",
+    primaryAction: "Briefing’i başlat",
   },
   "/final-checklist": {
-    title: "Final Checklist",
-    description: "Teslim ve savunma gereksinim kontrolü",
+    title: "Platform Status",
+    description: "Ürün hazırlık ve operasyon kontrolü",
     primaryAction: "Yeni kontrol",
   },
 };
 
 const quickTargets = [
-  { href: "/presentation", label: "Presentation Mode" },
+  { href: "/presentation", label: "Executive Briefing" },
   { href: "/reports", label: "Reports" },
-  { href: "/simulations", label: "Simulations" },
+  { href: "/simulations", label: "Scenarios" },
   { href: "/cloud-map", label: "Cloud Map" },
   { href: "/events", label: "Events" },
   { href: "/data-assets", label: "Data Assets" },
@@ -160,7 +160,7 @@ export function Header({
             <ActionButton variant="secondary" onClick={toggleTheme}>
               {theme === "dark" ? "Light" : "Dark"}
             </ActionButton>
-            <ActionButton onClick={startDemoScenario}>Demo Senaryosu Başlat</ActionButton>
+            <ActionButton onClick={startDemoScenario}>Operasyon Akışını Başlat</ActionButton>
             <ActionButton variant="secondary">{meta.primaryAction}</ActionButton>
           </div>
         </div>
@@ -199,7 +199,7 @@ export function Header({
             <ActionButton variant="secondary" onClick={toggleTheme}>
               {theme === "dark" ? "Light" : "Dark"}
             </ActionButton>
-            <ActionButton onClick={startDemoScenario}>Demo</ActionButton>
+            <ActionButton onClick={startDemoScenario}>Akış</ActionButton>
           </div>
         </div>
       </div>

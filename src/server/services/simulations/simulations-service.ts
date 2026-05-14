@@ -41,7 +41,7 @@ export async function runExecutiveDemo(input: {
     target: "executive-demo",
     severity: "info",
     result: "success",
-    details: "Executive demo çalıştırıldı.",
+    details: "Guided run başlatıldı.",
     ipAddress: input.actor.ipAddress,
     device: input.actor.userAgent,
   });
@@ -98,7 +98,7 @@ export async function runExecutiveDemo(input: {
     identityProfileId: identity.id,
     assetId: criticalAsset.id,
     requestedAction: criticalAsset.classification === "critical" ? "export" : "read",
-    justification: "Executive demo scenario orchestration",
+    justification: "Guided run orchestration",
     sourceLocation: identity.homeLocation,
     sourceRegion: identity.region,
     deviceTrust: identity.deviceTrust,
@@ -154,7 +154,7 @@ export async function runExecutiveDemo(input: {
     data: {
       organizationId: input.organizationId,
       scenarioId: "executive-demo",
-      summary: `Executive demo DB-backed akış üzerinden tamamlandı. Karar: ${evaluatedRequest?.evaluation.decision ?? "n/a"}, compliance: ${compliance.overallScore}%.`,
+      summary: `Guided run başarıyla tamamlandı. Karar: ${evaluatedRequest?.evaluation.decision ?? "n/a"}, compliance: ${compliance.overallScore}%.`,
       generatedEventIds,
       generatedReportIds: report ? [report.id] : [],
       affectedModules: ["Dashboard", "Access Requests", "Events", "Deception", "Compliance", "Reports"],
@@ -171,15 +171,15 @@ export async function runExecutiveDemo(input: {
     target: "executive-demo",
     severity: "info",
     result: "success",
-    details: "Executive demo tamamlandı.",
+    details: "Guided run tamamlandı.",
     ipAddress: input.actor.ipAddress,
     device: input.actor.userAgent,
   });
 
   await notifyOrganizationMembers({
     organizationId: input.organizationId,
-    title: "Executive demo completed",
-    description: "Executive demo senaryosu backend engine akışı üzerinden tamamlandı.",
+    title: "Guided run tamamlandı",
+    description: "Operasyon akışı backend engine zinciri üzerinden başarıyla tamamlandı.",
     type: "simulation_completed",
     severity: "low",
     module: "Simulations",

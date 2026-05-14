@@ -142,7 +142,7 @@ export function calculateNistCsfScores(environment: Omit<DemoEnvironment, "compl
       ),
       status: "warning",
       controls: ["SOAR", "Playbooks", "Containment", "Ticketing"],
-      gaps: ["Gerçek sistem entegrasyonları henüz mock seviyesinde."],
+      gaps: ["Gerçek sistem entegrasyonları henüz hazırlık seviyesinde."],
       improvements: ["IAM revoke ve ticketing API entegrasyonları eklenmeli."],
     },
     {

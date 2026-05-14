@@ -6,12 +6,17 @@ import { mockAuthAccounts, mockOrganization } from "@/lib/auth-mock-data";
 import { calculateComplianceSnapshot } from "@/lib/compliance-engine";
 import { triggerDeceptionAccess } from "@/lib/deception-engine";
 import {
+  getAvailableMockAuthAccounts,
+  isCustomDemoAuthAccount,
+} from "@/lib/demo-auth-storage";
+import {
   createSecurityEvent,
   executePlaybook,
   runSoarPlaybook,
   updateEventStatus as updateSecurityEventStatus,
 } from "@/lib/event-engine";
 import {
+  completeOnboarding as completeOnboardingApi,
   createAccessRequest as createAccessRequestApi,
   createDeceptionAsset as createDeceptionAssetApi,
   evaluateAccessRequest as evaluateAccessRequestApi,
@@ -33,6 +38,8 @@ import {
   markNotificationRead as markNotificationReadApi,
   recalculateAssetRisk as recalculateAssetRiskApi,
   recalculateCompliance as recalculateComplianceApi,
+  registerAccount,
+  requestPasswordReset as requestPasswordResetApi,
   runEventPlaybook,
   runExecutiveDemo as runExecutiveDemoApi,
   SettingsBundle,
@@ -94,6 +101,15 @@ type CreateEventPayload = Parameters<typeof createSecurityEvent>[0];
 type AuthActionResult = {
   success: boolean;
   error?: string;
+  message?: string;
+  redirectTo?: string;
+};
+
+type RegisterAccountPayload = {
+  fullName: string;
+  email: string;
+  password: string;
+  companyName: string;
 };
 
 type CreateAuditLogPayload = Omit<AuditLogItem, "id" | "timestamp" | "ipAddress" | "device" | "actorId" | "actorName" | "actorRole"> & {
@@ -215,9 +231,11 @@ export type SecurityConsoleStore = {
   refreshNotifications: () => Promise<void>;
   refreshSettings: () => Promise<void>;
   login: (email: string, password: string) => Promise<AuthActionResult>;
+  register: (payload: RegisterAccountPayload) => Promise<AuthActionResult>;
+  requestPasswordReset: (email: string) => Promise<AuthActionResult>;
   verify2FA: (code: string) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
-  completeOnboarding: (payload: OnboardingPayload) => void;
+  completeOnboarding: (payload: OnboardingPayload) => Promise<boolean>;
   can: (permission: Permission) => boolean;
   addAuditLog: (payload: CreateAuditLogPayload) => void;
   addNotification: (payload: CreateNotificationPayload) => void;
@@ -241,6 +259,7 @@ export type SecurityConsoleStore = {
 };
 
 const AUTH_SESSION_KEY = "hcsc-auth-session";
+const ALLOW_LOCAL_AUTH_FALLBACK = process.env.NODE_ENV !== "production";
 
 const listeners = new Set<() => void>();
 
@@ -578,6 +597,8 @@ function buildSnapshot(environment: DemoEnvironment, meta: StoreMeta): Omit<
   | "runRiskAnalysis"
   | "hydrateAuthSession"
   | "login"
+  | "register"
+  | "requestPasswordReset"
   | "verify2FA"
   | "logout"
   | "completeOnboarding"
@@ -711,7 +732,7 @@ function pushAuditLog(payload: CreateAuditLogPayload) {
         id: makeId("audit"),
         timestamp: new Date().toISOString(),
         ipAddress: "10.24.8.14",
-        device: "Managed macOS / Demo Browser",
+        device: "Managed macOS / Workspace Browser",
         actorId: payload.actorId ?? actor.actorId,
         actorName: payload.actorName ?? actor.actorName,
         actorRole: payload.actorRole ?? actor.actorRole,
@@ -737,7 +758,7 @@ function applyDemoStep(current: DemoEnvironment, stepIndex: number) {
 
   if (stepId === "demo-4") {
     const event = createSecurityEvent({
-      title: "Demo: Zero Trust karar olayı",
+      title: "Zero Trust karar olayı",
       severity: "high",
       category: "policy_violation",
       source: "Zero Trust Policy Engine",
@@ -970,6 +991,8 @@ const actions: Pick<
   | "runRiskAnalysis"
   | "hydrateAuthSession"
   | "login"
+  | "register"
+  | "requestPasswordReset"
   | "verify2FA"
   | "logout"
   | "completeOnboarding"
@@ -1032,9 +1055,9 @@ const actions: Pick<
           accessRequests: [buildDemoRequest(currentEnvironment), ...currentEnvironment.accessRequests],
         });
         addEvent({
-          title: "Simülasyon: MFA olmadan kritik erişim",
+          title: "MFA olmadan kritik erişim",
           category: "policy_violation",
-          description: "Kritik veri için MFA eksik erişim talebi simüle edildi.",
+          description: "Kritik veri için MFA eksik erişim talebi üretildi.",
           recommendation: "Talep deny veya step-up ile sınırlandırılmalı.",
           severity: "high",
           source: "Simulation Center",
@@ -1044,7 +1067,7 @@ const actions: Pick<
         break;
       case "sim-2":
         addEvent({
-          title: "Simülasyon: mesai dışı export",
+          title: "Mesai dışı export denemesi",
           category: "suspicious_export",
           description: "Mesai dışı export talebi DLP ve SIEM akışına düştü.",
           recommendation: "Require MFA ve create ticket çalıştırılmalı.",
@@ -1062,7 +1085,7 @@ const actions: Pick<
           ),
         });
         addEvent({
-          title: "Simülasyon: şifrelenmemiş hassas veri",
+          title: "Şifrelenmemiş hassas veri",
           category: "missing_encryption",
           description: "Hassas public cloud varlığında encryption açığı üretildi.",
           recommendation: "Encryption ve KMS zorunlu hale getirilmeli.",
@@ -1074,7 +1097,7 @@ const actions: Pick<
         break;
       case "sim-5":
         addEvent({
-          title: "Simülasyon: üçüncü taraf API anomali",
+          title: "Üçüncü taraf API anomalisi",
           category: "third_party_anomaly",
           description: "Third-party connector olağan dışı istek paterni sergiledi.",
           recommendation: "Revoke token ve supplier review başlatılmalı.",
@@ -1086,7 +1109,7 @@ const actions: Pick<
         break;
       case "sim-6":
         addEvent({
-          title: "Simülasyon: ransomware indicator",
+          title: "Ransomware göstergesi",
           category: "ransomware_indicator",
           description: "Kısa sürede yoğun dosya değişiklik davranışı simüle edildi.",
           recommendation: "Kaynağı izole et ve backup restore hazırlığını başlat.",
@@ -1098,7 +1121,7 @@ const actions: Pick<
         break;
       case "sim-7":
         addEvent({
-          title: "Simülasyon: iç kullanıcı yetki aşımı",
+          title: "İç kullanıcı yetki aşımı",
           category: "unauthorized_access_attempt",
           description: "İç kullanıcı rolü dışında bir veri kümesine erişmeye çalıştı.",
           recommendation: "RBAC/ABAC politikası üzerinden deny uygulanmalı.",
@@ -1110,7 +1133,7 @@ const actions: Pick<
         break;
       case "sim-8":
         addEvent({
-          title: "Simülasyon: unrestricted resource consumption",
+          title: "Sınırlandırılmamış kaynak tüketimi",
           category: "api_abuse",
           description: "API kullanımında kaynak tüketim eşiği aşılmaya yaklaştı.",
           recommendation: "Rate limit ve quota enforcement artırılmalı.",
@@ -1122,7 +1145,7 @@ const actions: Pick<
         break;
       case "sim-9":
         addEvent({
-          title: "Simülasyon: loglama kapalı kaynak",
+          title: "Loglama kapalı kaynak",
           category: "visibility_gap",
           description: "Bir kaynağın telemetri akışı kesilmiş olarak simüle edildi.",
           recommendation: "Log forwarding agent yeniden aktive edilmeli.",
@@ -1134,7 +1157,7 @@ const actions: Pick<
         break;
       case "sim-10":
         addEvent({
-          title: "Simülasyon: KVKK yurt dışı aktarım riski",
+          title: "KVKK yurt dışı aktarım riski",
           category: "third_party_anomaly",
           description: "Kişisel veri içeren export paketi overseas transfer riski ile işaretlendi.",
           recommendation: "Transfer kaydı ve privacy review süreci başlatılmalı.",
@@ -1151,7 +1174,7 @@ const actions: Pick<
     const run: SimulationRunResult = {
       id: makeId("run"),
       scenarioId,
-      summary: `${next.simulations.find((simulation) => simulation.id === scenarioId)?.title ?? "Simülasyon"} senaryosu çalıştırıldı.`,
+      summary: `${next.simulations.find((simulation) => simulation.id === scenarioId)?.title ?? "Operasyon"} senaryosu çalıştırıldı.`,
       createdAt,
       generatedEventIds,
       affectedModules: next.simulations.find((simulation) => simulation.id === scenarioId)?.affectedModules ?? [],
@@ -1168,12 +1191,12 @@ const actions: Pick<
     );
 
     pushToast({
-      title: "Simülasyon tamamlandı",
+      title: "Senaryo tamamlandı",
       description: "İlgili olaylar, risk skorları ve raporlar güncellendi.",
       tone: "success",
     });
     pushNotification({
-      title: "Simülasyon tamamlandı",
+      title: "Senaryo tamamlandı",
       description: run.summary,
       type: "simulation_completed",
       severity: "info",
@@ -1492,7 +1515,7 @@ const actions: Pick<
         await hydrateEnvironmentFromApi({ silent: true });
         pushToast({
           title: "Kritik deception alarmı tetiklendi",
-          description: `${resolvedDeception.name} için güvenli erişim simülasyonu tamamlandı.`,
+          description: `${resolvedDeception.name} için güvenli deception akışı tamamlandı.`,
           tone: "deception",
         });
         return;
@@ -1798,7 +1821,7 @@ const actions: Pick<
       ],
     });
     pushToast({
-      title: "Yeni mock kural eklendi",
+      title: "Yeni politika kuralı eklendi",
       description: `${rule.name} Policy Engine listesine eklendi.`,
       tone: "policy",
     });
@@ -1885,8 +1908,8 @@ const actions: Pick<
       { demoMode: true },
     );
     pushToast({
-      title: "Demo senaryosu başlatıldı",
-      description: "Adımları Dashboard veya Presentation Mode üzerinden ilerletebilirsin.",
+      title: "Operasyon akışı başlatıldı",
+      description: "Adımları Dashboard veya Executive Briefing üzerinden ilerletebilirsin.",
       tone: "info",
     });
   },
@@ -1937,6 +1960,30 @@ const actions: Pick<
   async hydrateAuthSession() {
     if (currentMeta.auth.hydrated) return;
 
+    const persisted = readPersistedAuthMeta();
+    const persistedEmail = persisted?.currentUser?.email;
+
+    if (
+      ALLOW_LOCAL_AUTH_FALLBACK &&
+      persisted?.auth.isAuthenticated &&
+      persisted.auth.is2FAVerified &&
+      persistedEmail &&
+      isCustomDemoAuthAccount(persistedEmail)
+    ) {
+      setMeta({
+        auth: {
+          ...persisted.auth,
+          hydrated: true,
+        },
+        currentUser: persisted.currentUser ?? null,
+        onboardingCompleted: persisted.onboardingCompleted,
+        organization: persisted.organization ?? currentMeta.organization,
+        auditLogs: persisted.auditLogs ?? currentMeta.auditLogs,
+        notifications: persisted.notifications ?? currentMeta.notifications,
+      });
+      return;
+    }
+
     try {
       const result = await getCurrentUser();
       applyServerAuthPayload(result);
@@ -1948,8 +1995,6 @@ const actions: Pick<
     } catch {
       // Network or server failure falls back to persisted mock/session state.
     }
-
-    const persisted = readPersistedAuthMeta();
 
     if (!persisted) {
       setMeta({
@@ -2047,9 +2092,12 @@ const actions: Pick<
       // Fall back to existing mock flow if the API is unavailable.
     }
 
-    const account = mockAuthAccounts.find(
-      (entry) => entry.email.toLowerCase() === email.trim().toLowerCase() && entry.password === password,
-    );
+    const account =
+      ALLOW_LOCAL_AUTH_FALLBACK
+        ? getAvailableMockAuthAccounts().find(
+            (entry) => entry.email.toLowerCase() === email.trim().toLowerCase() && entry.password === password,
+          )
+        : null;
 
     if (!account) {
       pushToast({
@@ -2106,7 +2154,103 @@ const actions: Pick<
 
     return {
       success: true,
+      redirectTo: currentMeta.onboardingCompleted ? "/dashboard" : "/onboarding",
     };
+  },
+
+  async register(payload) {
+    try {
+      const result = await registerAccount(payload);
+
+      applyServerAuthPayload(result);
+      pushToast({
+        title: "Hesap oluşturuldu",
+        description: "İkinci faktör doğrulamasıyla oturumunu güvenli şekilde tamamlayabilirsin.",
+        tone: "success",
+      });
+
+      pushAuditLog({
+        action: "registration_completed",
+        module: "Authentication",
+        target: result.user?.email ?? payload.email,
+        severity: "info",
+        result: "success",
+        details: "Yeni hesap ve çalışma alanı oluşturuldu.",
+        actorName: result.user?.name ?? payload.fullName,
+        actorRole: result.user?.role ?? "Security Admin",
+        actorId: result.user?.id ?? null,
+      });
+
+      return {
+        success: true,
+        message: "Kayıt başarıyla tamamlandı. Devam etmek için 2FA doğrulamasını tamamla.",
+      };
+    } catch (error) {
+      const message = resolveApiErrorMessage(error, "Kayıt oluşturulamadı.");
+
+      if (!ALLOW_LOCAL_AUTH_FALLBACK) {
+        return {
+          success: false,
+          error: message,
+        };
+      }
+
+      return {
+        success: false,
+        error: message,
+      };
+    }
+  },
+
+  async requestPasswordReset(email) {
+    try {
+      const result = await requestPasswordResetApi(email);
+      const message =
+        result.message ?? "Eğer bu e-posta ile bir hesap varsa şifre sıfırlama bağlantısı gönderilecektir.";
+
+      pushToast({
+        title: "Şifre sıfırlama isteği alındı",
+        description: message,
+        tone: "info",
+      });
+
+      return {
+        success: true,
+        message,
+      };
+    } catch (error) {
+      const message = resolveApiErrorMessage(
+        error,
+        "Şifre sıfırlama isteği şu anda tamamlanamadı.",
+      );
+
+      if (ALLOW_LOCAL_AUTH_FALLBACK) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const knownAccount = getAvailableMockAuthAccounts().some(
+          (entry) => entry.email.toLowerCase() === normalizedEmail,
+        );
+
+        const fallbackMessage = knownAccount
+          ? "Şifre sıfırlama bağlantısı e-posta adresin için hazırlandı."
+          : "Eğer bu e-posta ile bir hesap varsa şifre sıfırlama bağlantısı gönderilecektir.";
+
+        pushToast({
+          title: "Şifre sıfırlama isteği alındı",
+          description: fallbackMessage,
+          tone: "info",
+        });
+
+        return {
+          success: true,
+          message: fallbackMessage,
+        };
+      }
+
+      return {
+        success: false,
+        error: message,
+      };
+    }
   },
 
   async verify2FA(code) {
@@ -2138,13 +2282,16 @@ const actions: Pick<
             result: "success",
             details: "2FA doğrulaması tamamlandı.",
           });
-          return { success: true };
+          return {
+            success: true,
+            redirectTo: result.data.onboardingCompleted ? "/dashboard" : "/onboarding",
+          };
         }
 
         if (!result.success) {
           pushToast({
             title: "2FA doğrulanamadı",
-            description: result.error ?? "Demo kodu 123456 ile eşleşen 6 haneli kod bekleniyor.",
+            description: result.error ?? "Lütfen 6 haneli doğrulama kodunu kontrol et.",
             tone: "warning",
           });
           pushAuditLog({
@@ -2165,7 +2312,10 @@ const actions: Pick<
       }
     }
 
-    const currentUser = currentMeta.currentUser ?? mockAuthAccounts.find((entry) => entry.id === currentMeta.auth.currentUserId);
+    const currentUser =
+      ALLOW_LOCAL_AUTH_FALLBACK
+        ? currentMeta.currentUser ?? mockAuthAccounts.find((entry) => entry.id === currentMeta.auth.currentUserId)
+        : currentMeta.currentUser;
     if (!currentUser) {
       return {
         success: false,
@@ -2176,7 +2326,7 @@ const actions: Pick<
     if (code.trim() !== "123456") {
       pushToast({
         title: "2FA doğrulanamadı",
-        description: "Demo kodu 123456 ile eşleşen 6 haneli kod bekleniyor.",
+        description: "Lütfen 6 haneli doğrulama kodunu kontrol et.",
         tone: "warning",
       });
       pushAuditLog({
@@ -2354,10 +2504,54 @@ const actions: Pick<
     }
   },
 
-  completeOnboarding(payload) {
+  async completeOnboarding(payload) {
+    const cloudModeMap: Record<OnboardingPayload["cloudMode"], "private_cloud" | "public_cloud" | "hybrid_cloud"> = {
+      "Private Cloud": "private_cloud",
+      "Public Cloud": "public_cloud",
+      "Hybrid Cloud": "hybrid_cloud",
+    };
+
+    try {
+      const result = await completeOnboardingApi({
+        organizationName: payload.organizationName,
+        city: payload.city,
+        usageType: payload.usageType,
+        defaultCurrency: payload.defaultCurrency,
+        cloudMode: cloudModeMap[payload.cloudMode],
+        complianceFrameworks: payload.complianceFrameworks,
+        seedStarterData: payload.seedDemoData,
+        runInitialScan: payload.runInitialScan,
+      });
+
+      setMeta({
+        organization: result.organization,
+        onboardingCompleted: result.onboardingCompleted,
+      });
+
+      await hydrateEnvironmentFromApi({ silent: true });
+
+      pushToast({
+        title: "Kurulum tamamlandı",
+        description: "Çalışma alanı kullanıma hazır.",
+        tone: "success",
+      });
+
+      return true;
+    } catch (error) {
+      if (!ALLOW_LOCAL_AUTH_FALLBACK) {
+        pushToast({
+          title: "Kurulum tamamlanamadı",
+          description: resolveApiErrorMessage(error, "Onboarding güncellenemedi."),
+          tone: "warning",
+        });
+        return false;
+      }
+    }
+
     const nextOrganization: OrganizationProfile = {
       ...currentMeta.organization,
       name: payload.organizationName || currentMeta.organization.name,
+      region: payload.city?.trim() || currentMeta.organization.region,
       cloudMode: payload.cloudMode,
       complianceFrameworks: payload.complianceFrameworks,
     };
@@ -2387,8 +2581,10 @@ const actions: Pick<
       target: nextOrganization.name,
       severity: "info",
       result: "success",
-      details: `${payload.cloudMode} kurulumu ve ${payload.complianceFrameworks.join(", ")} çerçeveleri etkinleştirildi.`,
+      details: `${payload.cloudMode} kurulumu, ${payload.complianceFrameworks.join(", ")} çerçeveleri ve ${payload.defaultCurrency ?? "TRY"} varsayılan para birimi ile tamamlandı.${payload.usageType ? ` Kullanım tipi: ${payload.usageType}.` : ""}`,
     });
+
+    return true;
   },
 
   can(permission) {
@@ -2455,15 +2651,15 @@ const actions: Pick<
       await simulateDeceptionAccessApi(deceptionAssetId, payload);
       await hydrateEnvironmentFromApi({ silent: true });
       pushToast({
-        title: "Deception erişimi simüle edildi",
+        title: "Deception erişimi işlendi",
         description: "Kritik event, audit ve bildirim akışı güncellendi.",
         tone: "deception",
       });
       return;
     } catch (error) {
       pushToast({
-        title: "Deception simülasyonu başarısız",
-        description: resolveApiErrorMessage(error, "Deception simülasyonu tamamlanamadı."),
+        title: "Deception işlemi başarısız",
+        description: resolveApiErrorMessage(error, "Deception akışı tamamlanamadı."),
         tone: "warning",
       });
     } finally {
@@ -2482,15 +2678,15 @@ const actions: Pick<
         lastSimulationResult: result.run ?? currentMeta.lastSimulationResult,
       });
       pushToast({
-        title: "Executive demo tamamlandı",
-        description: result.run?.summary ?? "Backend engine akışıyla demo çalıştırıldı.",
+        title: "Guided run tamamlandı",
+        description: result.run?.summary ?? "Backend engine akışı başarıyla tamamlandı.",
         tone: "success",
       });
       return;
     } catch (error) {
       pushToast({
-        title: "Executive demo başlatılamadı",
-        description: resolveApiErrorMessage(error, "Executive demo çalıştırılamadı."),
+        title: "Guided run başlatılamadı",
+        description: resolveApiErrorMessage(error, "Guided run çalıştırılamadı."),
         tone: "warning",
       });
     } finally {

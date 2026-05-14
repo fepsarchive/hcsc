@@ -102,7 +102,7 @@ export function PolicyView() {
         </Panel>
 
         <Panel>
-          <h2 className="text-xl font-semibold text-white">Yeni mock kural ekle</h2>
+          <h2 className="text-xl font-semibold text-white">Yeni politika kuralı ekle</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
             Local state tabanlı bu yapı ileride veritabanı veya API üzerinden yönetilebilir.
           </p>

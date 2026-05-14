@@ -20,19 +20,19 @@ const workspaceItems: SidebarItem[] = [
   { href: "/data-assets", label: "Data Assets", description: "Veri varlıkları ve risk", icon: "▣" },
   { href: "/access-requests", label: "Access Requests", description: "Zero Trust talepleri", icon: "⇢" },
   { href: "/policy-engine", label: "Policy Engine", description: "PE / PA / PEP kuralları", icon: "⌘" },
-  { href: "/deception", label: "Deception", description: "Aldatma ve active defense", icon: "◈" },
+  { href: "/deception", label: "Deception", description: "Aldatma ve aktif savunma", icon: "◈" },
   { href: "/events", label: "Events", description: "SIEM / SOAR olay merkezi", icon: "☰" },
   { href: "/compliance", label: "Compliance", description: "NIST, ISO, KVKK, GDPR", icon: "▤" },
   { href: "/threat-matrix", label: "Threat Matrix", description: "Tehdit-kontrol kapsaması", icon: "▦" },
   { href: "/reports", label: "Reports", description: "Raporlar ve çıktı katmanı", icon: "≣" },
-  { href: "/simulations", label: "Simulations", description: "Demo ve senaryo merkezi", icon: "▷" },
-  { href: "/presentation", label: "Presentation Mode", description: "Jüri sunum akışı", icon: "▸" },
+  { href: "/simulations", label: "Scenarios", description: "Operasyon ve senaryo merkezi", icon: "▷" },
+  { href: "/presentation", label: "Executive Briefing", description: "Yönetim görünümü", icon: "▸" },
 ];
 
 const systemItems: SidebarItem[] = [
-  { href: "/final-checklist", label: "Final Checklist", description: "Teslim gereksinim görünümü", icon: "✓" },
-  { href: "/final-checklist", label: "Settings", description: "Demo ve görünüm ayarları", icon: "⚙" },
-  { href: "/presentation", label: "Documentation", description: "Sunum ve açıklama akışı", icon: "?" },
+  { href: "/final-checklist", label: "Platform Status", description: "Ürün hazırlık görünümü", icon: "✓" },
+  { href: "/final-checklist", label: "Settings", description: "Çalışma alanı ve görünüm ayarları", icon: "⚙" },
+  { href: "/presentation", label: "Briefing", description: "Yönetici anlatım akışı", icon: "?" },
 ];
 
 export function Sidebar({
@@ -106,7 +106,7 @@ export function Sidebar({
               Hybrid Cloud Security Console
             </p>
             <p className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">
-              Active Defense Prototype
+              Active Defense Workspace
             </p>
           </div>
         </div>
@@ -180,8 +180,8 @@ export function Sidebar({
               varlığı alarm üretmiş durumda.
             </p>
             <div className="mt-3 flex items-center justify-between text-[11px] text-violet-100/75">
-              <span>Demo Mode</span>
-              <span>v0.1 prototype</span>
+              <span>Watch Mode</span>
+              <span>live workspace</span>
             </div>
             {onToggleCollapse ? (
               <button

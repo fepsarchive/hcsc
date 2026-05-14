@@ -139,6 +139,9 @@ export interface AuthState {
 
 export interface OnboardingPayload {
   organizationName: string;
+  city?: string;
+  usageType?: "saas" | "fintech" | "retail" | "platform" | "managed-security";
+  defaultCurrency?: "TRY" | "USD" | "EUR" | "GBP";
   cloudMode: OrganizationProfile["cloudMode"];
   complianceFrameworks: string[];
   seedDemoData: boolean;
@@ -148,9 +151,12 @@ export interface OnboardingPayload {
 export type AuditSeverity = "info" | "warning" | "high" | "critical";
 export type AuditResult = "success" | "failure" | "blocked";
 export type AuditAction =
+  | "registration_completed"
   | "login_attempt"
   | "login_success"
   | "login_failed"
+  | "password_reset_requested"
+  | "password_reset_completed"
   | "two_factor_verified"
   | "two_factor_failed"
   | "logout"

@@ -8,7 +8,7 @@ export type MockAuthAccount = AppUser & {
 export const mockOrganization: OrganizationProfile = {
   id: "org-astrasec",
   name: "AstraSec Financial Cloud Lab",
-  plan: "Thesis Prototype / Enterprise Simulation",
+  plan: "Enterprise Security Workspace",
   region: "Türkiye / EU",
   complianceFrameworks: ["KVKK", "GDPR", "ISO 27001", "NIST CSF 2.0"],
   cloudMode: "Hybrid Cloud",
