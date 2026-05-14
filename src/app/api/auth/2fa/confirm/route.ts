@@ -6,6 +6,7 @@ import { apiError, apiOk } from "@/server/api/response";
 import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { createAuthAuditLog } from "@/server/auth/session";
+import { ensureRecoveryCodesForUser } from "@/server/auth/recovery-codes";
 import {
   isReplayProtectedStep,
   isTwoFactorEnrolled,
@@ -133,6 +134,9 @@ export async function POST(request: NextRequest) {
     matchedStep: verification.matchedStep,
     markEnrollment: true,
   });
+  const recoveryCodes = await ensureRecoveryCodesForUser({
+    userId: auth.context.session.userId,
+  });
 
   await createAuthAuditLog({
     organizationId: auth.context.session.organizationId,
@@ -156,6 +160,7 @@ export async function POST(request: NextRequest) {
     organization: mapOrganizationToProfile(updatedSession.organization),
     onboardingCompleted: updatedSession.organization.onboardingCompleted,
     twoFactorEnrolled: true,
+    recoveryCodes: recoveryCodes ?? undefined,
     nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
   });
 }

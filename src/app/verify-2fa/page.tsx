@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, KeyRoundIcon, QrCodeIcon, ShieldCheckIcon } from "lucide-react";
+import { ArrowRightIcon, CopyIcon, KeyRoundIcon, QrCodeIcon, ShieldCheckIcon } from "lucide-react";
 import QRCode from "qrcode";
 
 import { AuthLinks, AuthMessage, AuthShell } from "@/components/auth/auth-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/loading-state";
+import { Textarea } from "@/components/ui/textarea";
 import { confirmTwoFactorSetup, getTwoFactorSetup, HcscApiError, type TwoFactorSetupPayload } from "@/lib/hcsc-api";
 import { useSecurityConsoleStore } from "@/store/security-console-store";
 
@@ -30,11 +32,20 @@ export default function VerifyTwoFactorPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedRecoveryCodes, setCopiedRecoveryCodes] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verificationMethod, setVerificationMethod] = useState<"totp" | "recovery">("totp");
+  const [generatedRecoveryCodes, setGeneratedRecoveryCodes] = useState<string[] | null>(null);
+  const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
+  const [recoveryCodesAcknowledged, setRecoveryCodesAcknowledged] = useState(false);
 
   const maskedEmail = useMemo(
     () => currentUser?.email ?? "hesabın",
     [currentUser?.email],
+  );
+  const formattedRecoveryCodes = useMemo(
+    () => (generatedRecoveryCodes ? generatedRecoveryCodes.join("\n") : ""),
+    [generatedRecoveryCodes],
   );
 
   useEffect(() => {
@@ -106,8 +117,13 @@ export default function VerifyTwoFactorPage() {
 
     const normalizedCode = code.replace(/\D/g, "").slice(0, 6);
 
-    if (normalizedCode.length !== 6) {
-      setError("Lütfen authenticator uygulamandaki 6 haneli kodu gir.");
+    if (verificationMethod === "totp") {
+      if (normalizedCode.length !== 6) {
+        setError("Lütfen authenticator uygulamandaki 6 haneli kodu gir.");
+        return;
+      }
+    } else if (code.trim().length < 8) {
+      setError("Lütfen geçerli bir recovery code gir.");
       return;
     }
 
@@ -118,7 +134,14 @@ export default function VerifyTwoFactorPage() {
         const result = await confirmTwoFactorSetup(normalizedCode);
         await hydrateAuthSession();
         setError(null);
-        router.replace(result.nextPath ?? (result.onboardingCompleted ? "/dashboard" : "/onboarding"));
+        if (result.recoveryCodes?.length) {
+          setGeneratedRecoveryCodes(result.recoveryCodes);
+          setPendingRedirect(result.nextPath ?? (result.onboardingCompleted ? "/dashboard" : "/onboarding"));
+          setRecoveryCodesAcknowledged(false);
+          setCode("");
+        } else {
+          router.replace(result.nextPath ?? (result.onboardingCompleted ? "/dashboard" : "/onboarding"));
+        }
       } catch (setupError) {
         setError(
           setupError instanceof HcscApiError
@@ -132,7 +155,7 @@ export default function VerifyTwoFactorPage() {
       return;
     }
 
-    const result = await verify2FA(normalizedCode);
+    const result = await verify2FA(verificationMethod === "totp" ? normalizedCode : code.trim(), verificationMethod);
     setIsSubmitting(false);
 
     if (!result.success) {
@@ -142,6 +165,20 @@ export default function VerifyTwoFactorPage() {
 
     setError(null);
     router.replace(result.redirectTo ?? "/dashboard");
+  };
+
+  const handleCopyRecoveryCodes = async () => {
+    if (!generatedRecoveryCodes?.length) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(generatedRecoveryCodes.join("\n"));
+      setCopiedRecoveryCodes(true);
+      setTimeout(() => setCopiedRecoveryCodes(false), 2000);
+    } catch {
+      setError("Recovery code listesi panoya kopyalanamadı. Elle kaydetmeyi deneyebilirsin.");
+    }
   };
 
   const handleCopySecret = async () => {
@@ -188,7 +225,58 @@ export default function VerifyTwoFactorPage() {
           className="min-h-[320px]"
         />
       ) : (
-        <div className="space-y-4">
+              <div className="space-y-4">
+          {generatedRecoveryCodes?.length ? (
+            <div className="space-y-4">
+              <AuthMessage
+                tone="success"
+                title="Recovery code setin hazır"
+                description="Bu kodları şimdi kaydet. Güvenlik nedeniyle aynı düz metin hali tekrar gösterilmeyecek."
+              />
+              <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                      Recovery Codes
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                      Authenticator uygulamana erişemediğinde bu tek kullanımlık kodlardan birini kullanarak güvenli giriş yapabilirsin.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" className="rounded-xl" onClick={handleCopyRecoveryCodes}>
+                    <CopyIcon />
+                    {copiedRecoveryCodes ? "Kopyalandı" : "Kopyala"}
+                  </Button>
+                </div>
+                <Textarea
+                  readOnly
+                  value={formattedRecoveryCodes}
+                  className="mt-4 min-h-[220px] rounded-2xl font-mono text-sm leading-7"
+                />
+                <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
+                  Bu kodların her biri yalnızca bir kez kullanılabilir. Kodları parola yöneticinde veya güvenli bir çevrimdışı kasada sakla.
+                </div>
+                <label className="mt-4 flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
+                  <Checkbox
+                    checked={recoveryCodesAcknowledged}
+                    onCheckedChange={(checked) => setRecoveryCodesAcknowledged(Boolean(checked))}
+                    className="mt-1"
+                  />
+                  <span>Recovery code setini güvenli bir yere kaydettiğimi onaylıyorum.</span>
+                </label>
+              </div>
+              <Button
+                type="button"
+                className="h-11 w-full rounded-xl"
+                disabled={!recoveryCodesAcknowledged}
+                onClick={() => router.replace(pendingRedirect ?? "/dashboard")}
+              >
+                Kodları kaydettim, devam et
+                <ArrowRightIcon />
+              </Button>
+            </div>
+          ) : (
+            <>
           {error ? <AuthMessage tone="critical" title="2FA işlemi tamamlanamadı" description={error} /> : null}
 
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -260,9 +348,35 @@ export default function VerifyTwoFactorPage() {
                       Secure Session
                     </p>
                     <p className="text-sm text-[var(--text-secondary)]">
-                      Authenticator uygulamandaki doğrulama koduyla oturumunu tamamla.
+                      Authenticator uygulamandaki doğrulama koduyla veya recovery code ile oturumunu tamamla.
                     </p>
                   </div>
+                </div>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={verificationMethod === "totp" ? "default" : "outline"}
+                    className="rounded-xl"
+                    onClick={() => {
+                      setVerificationMethod("totp");
+                      setCode("");
+                      setError(null);
+                    }}
+                  >
+                    Authenticator kodu
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={verificationMethod === "recovery" ? "default" : "outline"}
+                    className="rounded-xl"
+                    onClick={() => {
+                      setVerificationMethod("recovery");
+                      setCode("");
+                      setError(null);
+                    }}
+                  >
+                    Recovery code kullan
+                  </Button>
                 </div>
               </div>
             )}
@@ -274,12 +388,14 @@ export default function VerifyTwoFactorPage() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                    6 Haneli Kod
+                    {verificationMethod === "totp" ? "6 Haneli Kod" : "Recovery Code"}
                   </p>
                   <p className="text-sm text-[var(--text-secondary)]">
                     {mode === "setup"
                       ? "Kurulumu tamamlamak için authenticator uygulamandaki ilk geçerli kodu gir."
-                      : "Güvenli oturumu tamamlamak için geçerli TOTP kodunu gir."}
+                      : verificationMethod === "totp"
+                        ? "Güvenli oturumu tamamlamak için geçerli TOTP kodunu gir."
+                        : "Authenticator uygulamana erişimin yoksa daha önce kaydettiğin tek kullanımlık recovery code gir."}
                   </p>
                 </div>
               </div>
@@ -287,13 +403,16 @@ export default function VerifyTwoFactorPage() {
               <Input
                 value={code}
                 onChange={(event) => {
-                  const next = event.target.value.replace(/\D/g, "").slice(0, 6);
+                  const next =
+                    verificationMethod === "totp"
+                      ? event.target.value.replace(/\D/g, "").slice(0, 6)
+                      : event.target.value.toUpperCase();
                   setCode(next);
                   setError(null);
                 }}
-                inputMode="numeric"
-                placeholder="000000"
-                className="mt-5 h-14 rounded-2xl text-center text-2xl tracking-[0.45em]"
+                inputMode={verificationMethod === "totp" ? "numeric" : "text"}
+                placeholder={verificationMethod === "totp" ? "000000" : "HCSC-ABCD-1234"}
+                className={`mt-5 h-14 rounded-2xl ${verificationMethod === "totp" ? "text-center text-2xl tracking-[0.45em]" : "font-mono text-base tracking-[0.2em]"}`}
                 aria-label="2FA kodu"
               />
             </div>
@@ -305,10 +424,14 @@ export default function VerifyTwoFactorPage() {
                   : "Doğrulanıyor..."
                 : mode === "setup"
                   ? "Kurulumu tamamla"
-                  : "Doğrula"}
+                  : verificationMethod === "totp"
+                    ? "Doğrula"
+                    : "Recovery code ile devam et"}
               {!isSubmitting ? <ArrowRightIcon /> : null}
             </Button>
           </form>
+            </>
+          )}
         </div>
       )}
     </AuthShell>

@@ -79,6 +79,15 @@ export async function getSessionContext(rawToken: string | null) {
       user: {
         include: {
           twoFactorSecret: true,
+          recoveryCodes: {
+            where: {
+              usedAt: null,
+            },
+            select: {
+              id: true,
+              createdAt: true,
+            },
+          },
         },
       },
       organization: true,
@@ -120,6 +129,15 @@ export async function markSessionTwoFactorVerified(sessionId: string) {
       user: {
         include: {
           twoFactorSecret: true,
+          recoveryCodes: {
+            where: {
+              usedAt: null,
+            },
+            select: {
+              id: true,
+              createdAt: true,
+            },
+          },
         },
       },
       organization: true,

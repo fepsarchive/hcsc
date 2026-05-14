@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
+import { consumeRecoveryCode } from "@/server/auth/recovery-codes";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { buildRequestMeta, createAuthAuditLog, getSessionContext, getSessionTokenFromRequest } from "@/server/auth/session";
 import { isReplayProtectedStep, isTwoFactorEnrolled, persistSuccessfulTwoFactorVerification, verifyTwoFactorCode } from "@/server/auth/two-factor";
 
 const verifySchema = z.object({
-  code: z.string().trim().length(6),
+  code: z.string().trim().min(6).max(32),
+  method: z.enum(["totp", "recovery"]).default("totp"),
 });
 
 export async function POST(request: NextRequest) {
@@ -28,6 +30,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (session.is2FAVerified || session.status !== "pending_2fa") {
+    return NextResponse.json(
+      {
+        data: null,
+        meta: { requestId: meta.requestId },
+        error: {
+          code: "TWO_FACTOR_ALREADY_VERIFIED",
+          message: "Bu oturum için iki aşamalı doğrulama zaten tamamlandı.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+
   const json = await request.json().catch(() => null);
   const parsed = verifySchema.safeParse(json);
 
@@ -38,7 +54,7 @@ export async function POST(request: NextRequest) {
         meta: { requestId: meta.requestId },
         error: {
           code: "VALIDATION_ERROR",
-          message: "6 haneli doğrulama kodu bekleniyor.",
+          message: "Geçerli bir doğrulama kodu bekleniyor.",
         },
       },
       { status: 400 },
@@ -99,6 +115,90 @@ export async function POST(request: NextRequest) {
         },
       },
       { status: 409 },
+    );
+  }
+
+  if (parsed.data.method === "recovery") {
+    const recovery = await consumeRecoveryCode({
+      userId: session.userId,
+      code: parsed.data.code,
+    });
+
+    if (!recovery.success) {
+      await createAuthAuditLog({
+        organizationId: session.organizationId,
+        userId: session.userId,
+        actorName: session.user.name,
+        actorRole: mapDbUserToAppUser(session.user).role,
+        action: "two_factor_failed",
+        target: session.user.email,
+        severity: "warning",
+        result: "failure",
+        details: "Geçersiz veya daha önce kullanılmış recovery code reddedildi.",
+        ipAddress: meta.ipAddress,
+        device: meta.userAgent,
+      });
+
+      return NextResponse.json(
+        {
+          data: null,
+          meta: { requestId: meta.requestId },
+          error: {
+            code: "INVALID_2FA_CODE",
+            message: "Doğrulama kodu hatalı veya süresi dolmuş.",
+          },
+        },
+        { status: 401 },
+      );
+    }
+
+    const updatedSession = await persistSuccessfulTwoFactorVerification({
+      sessionId: session.id,
+      userId: session.userId,
+      twoFactorSecretId: twoFactorSecret.id,
+    });
+
+    await createAuthAuditLog({
+      organizationId: session.organizationId,
+      userId: session.userId,
+      actorName: session.user.name,
+      actorRole: mapDbUserToAppUser(session.user).role,
+      action: "recovery_code_used",
+      target: session.user.email,
+      severity: "info",
+      result: "success",
+      details: "Recovery code ile 2FA doğrulaması tamamlandı.",
+      ipAddress: meta.ipAddress,
+      device: meta.userAgent,
+    });
+
+    return NextResponse.json({
+      data: {
+        authenticated: true,
+        twoFactorVerified: true,
+        sessionStartedAt: updatedSession.createdAt.toISOString(),
+        user: mapDbUserToAppUser(updatedSession.user),
+        organization: mapOrganizationToProfile(updatedSession.organization),
+        onboardingCompleted: updatedSession.organization.onboardingCompleted,
+        twoFactorEnrolled: true,
+        nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
+      },
+      meta: { requestId: meta.requestId },
+      error: null,
+    });
+  }
+
+  if (!/^\d{6}$/.test(parsed.data.code)) {
+    return NextResponse.json(
+      {
+        data: null,
+        meta: { requestId: meta.requestId },
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "6 haneli doğrulama kodu bekleniyor.",
+        },
+      },
+      { status: 400 },
     );
   }
 

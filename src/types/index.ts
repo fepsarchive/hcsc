@@ -159,6 +159,8 @@ export type AuditAction =
   | "password_reset_completed"
   | "two_factor_verified"
   | "two_factor_failed"
+  | "recovery_code_used"
+  | "recovery_codes_regenerated"
   | "logout"
   | "onboarding_completed"
   | "access_request_evaluated"

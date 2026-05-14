@@ -1,12 +1,15 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   BellRingIcon,
   BlocksIcon,
   Building2Icon,
+  CopyIcon,
+  KeyRoundIcon,
   LifeBuoyIcon,
   Paintbrush2Icon,
+  RotateCwIcon,
   ShieldCheckIcon,
   UserCircle2Icon,
   Users2Icon,
@@ -31,6 +34,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { getAvailableMockAuthAccounts } from "@/lib/demo-auth-storage";
+import { getRecoveryCodeStatus, HcscApiError, regenerateRecoveryCodes, type RecoveryCodeStatusPayload } from "@/lib/hcsc-api";
 import { rolePermissions } from "@/lib/permissions";
 
 const SETTINGS_PREFERENCES_KEY = "hcsc-settings-preferences";
@@ -310,6 +314,7 @@ export function SettingsView() {
                 disabled={!canManageSettings}
                 onSave={(next) => persistWorkspacePreferences(next, "Güvenlik tercihleri güncellendi.")}
               />
+              <RecoveryCodesPanel className="mt-5" disabled={!canManageSettings || !auth.is2FAVerified} />
             </Panel>
 
             <Panel>
@@ -501,6 +506,166 @@ function TeamAccessOverview({
           </div>
           <Badge variant="outline">Hazır</Badge>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RecoveryCodesPanel({
+  className,
+  disabled,
+}: {
+  className?: string;
+  disabled: boolean;
+}) {
+  const [status, setStatus] = useState<RecoveryCodeStatusPayload | null>(null);
+  const [isLoading, setIsLoading] = useState(() => !disabled);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (disabled) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadStatus() {
+      if (!cancelled) {
+        setIsLoading(true);
+      }
+
+      try {
+        const nextStatus = await getRecoveryCodeStatus();
+
+        if (!cancelled) {
+          setStatus(nextStatus);
+          setError(null);
+        }
+      } catch (statusError) {
+        if (!cancelled) {
+          setError(
+            statusError instanceof HcscApiError
+              ? statusError.message
+              : "Recovery code durumu şu anda yüklenemedi.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [disabled]);
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+
+    try {
+      const result = await regenerateRecoveryCodes();
+      setRecoveryCodes(result.recoveryCodes);
+      setStatus(result.status);
+      setError(null);
+      toast.success("Yeni recovery code seti üretildi.");
+    } catch (regenerationError) {
+      setError(
+        regenerationError instanceof HcscApiError
+          ? regenerationError.message
+          : "Recovery code seti yenilenemedi.",
+      );
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!recoveryCodes?.length) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(recoveryCodes.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setError("Recovery code listesi panoya kopyalanamadı.");
+    }
+  };
+
+  return (
+    <div className={`rounded-3xl border border-[var(--border)] bg-[var(--surface)] px-4 py-5 ${className ?? ""}`}>
+      <div className="flex items-start gap-3">
+        <div className="flex size-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]">
+          <KeyRoundIcon className="size-5 text-cyan-300" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Recovery Codes</p>
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            Authenticator uygulamasına erişemediğinde tek kullanımlık kurtarma kodlarıyla hesabına güvenli şekilde dönebilirsin.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Badge variant="outline">{status?.remainingCodes ?? 0} kullanılmamış kod</Badge>
+        <Badge variant="outline">
+          {status?.lastGeneratedAt
+            ? `Son üretim ${new Date(status.lastGeneratedAt).toLocaleDateString("tr-TR")}`
+            : "Henüz üretilmedi"}
+        </Badge>
+      </div>
+
+      {error ? (
+        <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm leading-6 text-rose-100">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-4">
+        {disabled ? (
+          <p className="text-sm text-[var(--text-secondary)]">
+            Recovery code yönetimi için doğrulanmış 2FA oturumu ve ayar düzenleme yetkisi gerekir.
+          </p>
+        ) : isLoading ? (
+          <p className="text-sm text-[var(--text-secondary)]">Recovery code durumu yükleniyor...</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Metric label="Toplam set" value={String(status?.totalCodes ?? 0)} />
+            <Metric label="Kalan" value={String(status?.remainingCodes ?? 0)} />
+            <Metric label="Kullanılan" value={String(status?.usedCodes ?? 0)} />
+          </div>
+        )}
+      </div>
+
+      {recoveryCodes?.length ? (
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-[var(--text-primary)]">Yeni recovery code setin hazır</p>
+            <Button type="button" variant="outline" className="rounded-xl" onClick={handleCopy}>
+              <CopyIcon />
+              {copied ? "Kopyalandı" : "Kopyala"}
+            </Button>
+          </div>
+          <Textarea readOnly value={recoveryCodes.join("\n")} className="min-h-[220px] rounded-2xl font-mono text-sm leading-7" />
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
+            Bu kodlar sadece şimdi gösterilir. Eski kullanılmamış kodlar iptal edildi; yeni seti güvenli bir kasada sakla.
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex justify-end">
+        <Button type="button" disabled={disabled || isRegenerating} onClick={() => void handleRegenerate()}>
+          <RotateCwIcon className={isRegenerating ? "animate-spin" : ""} />
+          {isRegenerating ? "Yeni set üretiliyor..." : "Yeni recovery code üret"}
+        </Button>
       </div>
     </div>
   );
