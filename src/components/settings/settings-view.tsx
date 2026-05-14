@@ -8,10 +8,12 @@ import {
   CopyIcon,
   KeyRoundIcon,
   LifeBuoyIcon,
+  MailPlusIcon,
   Paintbrush2Icon,
   RotateCwIcon,
   ShieldCheckIcon,
   UserCircle2Icon,
+  UserMinusIcon,
   Users2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -33,9 +35,20 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { getAvailableMockAuthAccounts } from "@/lib/demo-auth-storage";
-import { getRecoveryCodeStatus, HcscApiError, regenerateRecoveryCodes, type RecoveryCodeStatusPayload } from "@/lib/hcsc-api";
+import {
+  createTeamInvite,
+  disableTeamMember,
+  getRecoveryCodeStatus,
+  getTeamInvites,
+  getTeamMembers,
+  HcscApiError,
+  regenerateRecoveryCodes,
+  revokeTeamInvite,
+  type RecoveryCodeStatusPayload,
+  updateTeamMemberRole,
+} from "@/lib/hcsc-api";
 import { rolePermissions } from "@/lib/permissions";
+import type { TeamInviteRecord, TeamMemberRecord, TeamRoleKey } from "@/types";
 
 const SETTINGS_PREFERENCES_KEY = "hcsc-settings-preferences";
 
@@ -126,28 +139,6 @@ export function SettingsView() {
     settingsBundle?.reportBranding?.confidentialityLabel === "Internal / Thesis Prototype"
       ? "Internal / Confidential"
       : settingsBundle?.reportBranding?.confidentialityLabel;
-  const teamMembers = useMemo(() => {
-    const members = getAvailableMockAuthAccounts();
-
-    if (members.length > 0) {
-      return members;
-    }
-
-    if (!currentUser) {
-      return [];
-    }
-
-    return [
-      {
-        id: currentUser.id,
-        name: currentUser.name,
-        email: currentUser.email,
-        role: currentUser.role,
-        department: currentUser.department,
-        status: currentUser.status,
-      },
-    ];
-  }, [currentUser]);
   const effectiveWorkspacePreferences = useMemo(
     () => ({
       ...workspacePreferences,
@@ -260,7 +251,11 @@ export function SettingsView() {
 
             <Panel>
               <SectionHeader icon={<Users2Icon className="size-5 text-cyan-300" />} eyebrow="Users & Roles" title="Kullanıcılar ve roller" description="Mevcut çalışma alanı üyeleri, rol kapsamı ve erişim çerçevesi burada görünür." />
-              <TeamAccessOverview className="mt-5" members={teamMembers} />
+              <TeamManagementPanel
+                className="mt-5"
+                canManageSettings={canManageSettings}
+                currentUserId={currentUser?.id ?? null}
+              />
             </Panel>
           </div>
         </TabsContent>
@@ -460,53 +455,373 @@ function ProfileWorkspaceEditor({
   );
 }
 
-function TeamAccessOverview({
-  members,
+function TeamManagementPanel({
   className,
+  canManageSettings,
+  currentUserId,
 }: {
-  members: Array<{
-    id: string;
-    name: string;
-    email: string;
-    role: keyof typeof rolePermissions;
-    department: string;
-    status: string;
-  }>;
   className?: string;
+  canManageSettings: boolean;
+  currentUserId: string | null;
 }) {
+  const [members, setMembers] = useState<TeamMemberRecord[]>([]);
+  const [invites, setInvites] = useState<TeamInviteRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmittingInvite, setIsSubmittingInvite] = useState(false);
+  const [activeActionId, setActiveActionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<TeamRoleKey>("cloud_security_analyst");
+
+  const loadTeamData = async () => {
+    setIsLoading(true);
+
+    try {
+      const [{ members: nextMembers }, nextInvitesResponse] = await Promise.all([
+        getTeamMembers(),
+        canManageSettings ? getTeamInvites() : Promise.resolve({ invites: [] }),
+      ]);
+
+      setMembers(nextMembers);
+      setInvites(nextInvitesResponse.invites);
+      setError(null);
+    } catch (teamError) {
+      setError(
+        teamError instanceof HcscApiError
+          ? teamError.message
+          : "Takım bilgileri şu anda yüklenemedi.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const [{ members: nextMembers }, nextInvitesResponse] = await Promise.all([
+          getTeamMembers(),
+          canManageSettings ? getTeamInvites() : Promise.resolve({ invites: [] }),
+        ]);
+
+        if (!cancelled) {
+          setMembers(nextMembers);
+          setInvites(nextInvitesResponse.invites);
+          setError(null);
+          setIsLoading(false);
+        }
+      } catch (teamError) {
+        if (!cancelled) {
+          setError(
+            teamError instanceof HcscApiError
+              ? teamError.message
+              : "Takım bilgileri şu anda yüklenemedi.",
+          );
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageSettings]);
+
+  const handleInviteSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!inviteEmail.trim()) {
+      setError("Davet göndermek için bir e-posta adresi gir.");
+      return;
+    }
+
+    setIsSubmittingInvite(true);
+
+    try {
+      const result = await createTeamInvite({
+        email: inviteEmail.trim(),
+        role: inviteRole,
+      });
+
+      setInviteEmail("");
+      setInvites((current) => [result.invite, ...current.filter((invite) => invite.id !== result.invite.id)]);
+      setError(null);
+      toast.success(
+        result.delivery === "sent"
+          ? "Davet gönderildi."
+          : result.delivery === "failed"
+            ? "Davet oluşturuldu, ancak e-posta teslimatı doğrulanamadı."
+            : "Davet oluşturuldu.",
+      );
+
+      if (result.inviteUrl) {
+        void navigator.clipboard
+          .writeText(result.inviteUrl)
+          .then(() => toast.success("Development davet bağlantısı panoya kopyalandı."))
+          .catch(() => undefined);
+      }
+    } catch (inviteError) {
+      setError(
+        inviteError instanceof HcscApiError
+          ? inviteError.message
+          : "Davet gönderimi tamamlanamadı.",
+      );
+    } finally {
+      setIsSubmittingInvite(false);
+    }
+  };
+
+  const handleRoleUpdate = async (userId: string, role: TeamRoleKey) => {
+    setActiveActionId(`role:${userId}`);
+
+    try {
+      const { members: nextMembers } = await updateTeamMemberRole(userId, role);
+      setMembers(nextMembers);
+      setError(null);
+      toast.success("Rol güncellendi.");
+    } catch (roleError) {
+      setError(
+        roleError instanceof HcscApiError
+          ? roleError.message
+          : "Rol güncellenemedi.",
+      );
+    } finally {
+      setActiveActionId(null);
+    }
+  };
+
+  const handleDisable = async (userId: string) => {
+    setActiveActionId(`disable:${userId}`);
+
+    try {
+      const { members: nextMembers } = await disableTeamMember(userId);
+      setMembers(nextMembers);
+      setError(null);
+      toast.success("Üyelik kaldırıldı.");
+    } catch (disableError) {
+      setError(
+        disableError instanceof HcscApiError
+          ? disableError.message
+          : "Üyelik kaldırılamadı.",
+      );
+    } finally {
+      setActiveActionId(null);
+    }
+  };
+
+  const handleRevoke = async (inviteId: string) => {
+    setActiveActionId(`revoke:${inviteId}`);
+
+    try {
+      await revokeTeamInvite(inviteId);
+      setInvites((current) =>
+        current.map((invite) =>
+          invite.id === inviteId
+            ? {
+                ...invite,
+                status: "revoked",
+              }
+            : invite,
+        ),
+      );
+      setError(null);
+      toast.success("Davet iptal edildi.");
+    } catch (revokeError) {
+      setError(
+        revokeError instanceof HcscApiError
+          ? revokeError.message
+          : "Davet iptal edilemedi.",
+      );
+    } finally {
+      setActiveActionId(null);
+    }
+  };
+
+  const pendingInvites = invites.filter((invite) => invite.status === "pending");
+
   return (
     <div className={`space-y-4 ${className ?? ""}`}>
+      {error ? (
+        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm leading-6 text-rose-200">
+          {error}
+        </div>
+      ) : null}
+
+      {canManageSettings ? (
+        <form onSubmit={handleInviteSubmit} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]">
+              <MailPlusIcon className="size-4 text-cyan-300" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-[var(--text-primary)]">Takım daveti gönder</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+                Yeni üyeyi e-posta ile davet et, rolünü belirle ve kabul akışını güvenli bağlantı üzerinden tamamla.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
+            <Input
+              value={inviteEmail}
+              onChange={(event) => {
+                setInviteEmail(event.target.value);
+                setError(null);
+              }}
+              type="email"
+              placeholder="ornek@kurum.com"
+              autoComplete="email"
+              className="h-11 rounded-xl px-3.5"
+            />
+            <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as TeamRoleKey)}>
+              <SelectTrigger className="h-11 w-full rounded-xl px-3.5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="security_admin">Security Admin</SelectItem>
+                <SelectItem value="cloud_security_analyst">Cloud Security Analyst</SelectItem>
+                <SelectItem value="compliance_officer">Compliance Officer</SelectItem>
+                <SelectItem value="auditor">Auditor</SelectItem>
+                <SelectItem value="executive">Executive</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="submit" className="h-11 rounded-xl" disabled={isSubmittingInvite}>
+              {isSubmittingInvite ? "Gönderiliyor..." : "Davet gönder"}
+            </Button>
+          </div>
+        </form>
+      ) : null}
+
       <div className="grid gap-3">
-        {members.map((member) => (
-          <div key={member.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+        {isLoading ? (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-5 text-sm text-[var(--text-secondary)]">
+            Takım görünümü hazırlanıyor...
+          </div>
+        ) : members.length > 0 ? (
+          members.map((member) => (
+          <div key={member.membershipId} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <AvatarToken label={member.name} subtitle={`${member.email} • ${member.department}`} />
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">{member.role}</Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{member.roleLabel}</Badge>
                 <Badge variant="outline">{member.status}</Badge>
+                {member.isProtectedAdmin ? <Badge variant="outline">Protected owner</Badge> : null}
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {rolePermissions[member.role].slice(0, 6).map((permission) => (
+              {rolePermissions[member.roleLabel].slice(0, 6).map((permission) => (
                 <Badge key={permission} variant="outline">
                   {permission}
                 </Badge>
               ))}
             </div>
+
+            {canManageSettings ? (
+              <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                  Katılım: {new Date(member.joinedAt).toLocaleDateString("tr-TR")} • Son giriş:{" "}
+                  {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString("tr-TR") : "Henüz yok"}
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Select
+                    value={member.role}
+                    onValueChange={(value) => void handleRoleUpdate(member.userId, value as TeamRoleKey)}
+                    disabled={
+                      activeActionId === `role:${member.userId}` ||
+                      (member.isProtectedAdmin && member.userId === currentUserId)
+                    }
+                  >
+                    <SelectTrigger className="h-10 w-full min-w-[220px] rounded-xl px-3 text-sm sm:w-[220px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="security_admin">Security Admin</SelectItem>
+                      <SelectItem value="cloud_security_analyst">Cloud Security Analyst</SelectItem>
+                      <SelectItem value="compliance_officer">Compliance Officer</SelectItem>
+                      <SelectItem value="auditor">Auditor</SelectItem>
+                      <SelectItem value="executive">Executive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-xl"
+                    disabled={
+                      activeActionId === `disable:${member.userId}` ||
+                      member.isProtectedAdmin ||
+                      member.userId === currentUserId
+                    }
+                    onClick={() => void handleDisable(member.userId)}
+                  >
+                    <UserMinusIcon className="size-4" />
+                    Üyeliği kaldır
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
-        ))}
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-5 text-sm leading-6 text-[var(--text-secondary)]">
+            Bu çalışma alanında henüz ek ekip üyesi görünmüyor.
+          </div>
+        )}
       </div>
-      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-[var(--text-primary)]">Takım daveti akışı</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-              Çoklu kullanıcı ve rol yönetimi altyapısı hazır. Sonraki adımda davet, üyelik ve self-service provisioning akışı eklenebilir.
-            </p>
+
+      {canManageSettings ? (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Bekleyen davetler</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+                Kabul edilmemiş veya yeni gönderilmiş takım davetlerini buradan izleyebilir ve iptal edebilirsin.
+              </p>
+            </div>
+            <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={() => void loadTeamData()}>
+              <RotateCwIcon className="size-4" />
+              Yenile
+            </Button>
           </div>
-          <Badge variant="outline">Hazır</Badge>
+
+          <div className="mt-4 space-y-3">
+            {pendingInvites.length > 0 ? (
+              pendingInvites.map((invite) => (
+                <div
+                  key={invite.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-4 lg:flex-row lg:items-center lg:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{invite.email}</p>
+                    <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+                      {invite.roleLabel} • Son geçerlilik: {new Date(invite.expiresAt).toLocaleString("tr-TR")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{invite.status}</Badge>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 rounded-xl"
+                      disabled={activeActionId === `revoke:${invite.id}`}
+                      onClick={() => void handleRevoke(invite.id)}
+                    >
+                      Daveti iptal et
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-5 text-sm leading-6 text-[var(--text-secondary)]">
+                Bekleyen ekip daveti bulunmuyor.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

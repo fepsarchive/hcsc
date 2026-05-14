@@ -10,8 +10,8 @@ import { useDemo } from "@/components/layout/demo-provider"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
-const publicRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password", "/verify-2fa", "/onboarding"])
-const anonymousAccessibleRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password"])
+const publicRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password", "/verify-2fa", "/onboarding", "/accept-invite"])
+const anonymousAccessibleRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password", "/accept-invite"])
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -20,12 +20,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const contentScrollRef = useRef<HTMLDivElement | null>(null)
   const isPublicRoute = publicRoutes.has(pathname)
   const isAlwaysAccessiblePublicRoute =
-    pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password"
+    pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password" || pathname === "/accept-invite"
   const isScrollablePublicRoute =
     pathname === "/onboarding" ||
     pathname === "/register" ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
+    pathname === "/accept-invite" ||
     pathname === "/login" ||
     pathname === "/verify-2fa"
   const isPrintRoute = pathname.startsWith("/reports/") && pathname.endsWith("/print")
@@ -35,6 +36,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     if (!auth.isAuthenticated) {
       return anonymousAccessibleRoutes.has(pathname) ? null : "/login"
+    }
+
+    if (pathname === "/accept-invite") {
+      if (!auth.is2FAVerified) {
+        return "/verify-2fa"
+      }
+
+      return null
     }
 
     if (!auth.is2FAVerified) {
@@ -56,6 +65,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!redirectTarget || pathname === redirectTarget) return
     router.replace(redirectTarget)
   }, [pathname, redirectTarget, router])
+
+  useEffect(() => {
+    if (
+      !auth.hydrated ||
+      !auth.isAuthenticated ||
+      !auth.is2FAVerified ||
+      !onboardingCompleted ||
+      pathname === "/accept-invite" ||
+      typeof window === "undefined"
+    ) {
+      return
+    }
+
+    const pendingInviteToken = window.sessionStorage.getItem("hcsc-pending-invite-token")
+
+    if (pendingInviteToken) {
+      router.replace(`/accept-invite?token=${encodeURIComponent(pendingInviteToken)}`)
+    }
+  }, [auth.hydrated, auth.isAuthenticated, auth.is2FAVerified, onboardingCompleted, pathname, router])
 
   useEffect(() => {
     if (isPublicRoute) return

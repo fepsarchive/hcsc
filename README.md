@@ -1,16 +1,17 @@
-# HCSC v2 Foundation
+# HCSC v2 Production-Ready MVP
 
 Hybrid Cloud Security Console (HCSC), hibrit bulut güvenliği için tasarlanmış çok kiracılı, API-first ve aktif savunma odaklı bir güvenlik operasyon platformudur.
 
-HCSC v2 foundation:
+## Tamamlanan production checkpoint
 
-- Prisma + Neon/PostgreSQL kalıcı veri katmanı
-- DB-backed auth / session / 2FA
-- organization-scoped API katmanı
-- backend risk / Zero Trust / deception / compliance / report engine’leri
-- API-first frontend store hydration
-- güvenli deception trap endpoint
-- DB snapshot tabanlı report print flow
+- DB-backed register, session ve organization membership
+- gerçek TOTP 2FA enrollment
+- recovery codes
+- Resend ile password reset mail akışı
+- distributed rate limit (Upstash Redis + safe in-memory fallback)
+- organization-scoped API ve backend security engines
+- trap endpoint, print payload ve release-safe report flow
+- settings içinde security ve team management yüzeyleri
 
 ## Local kurulum
 
@@ -22,16 +23,16 @@ HCSC v2 foundation:
 npm install
 ```
 
-4. Prisma Client üret:
+4. Prisma client üret:
 
 ```bash
 npm run prisma:generate
 ```
 
-5. Migration uygula:
+5. Şema değişikliklerini uygula:
 
 ```bash
-npx prisma migrate dev --name init
+npm run db:push
 ```
 
 6. Başlangıç verisini yükle:
@@ -46,53 +47,47 @@ npm run db:seed
 npm run dev
 ```
 
-## Hazır erişim hesapları
+## Production env checklist
 
-- `security.admin@hcsc.local`
-- `analyst@hcsc.local`
-- `compliance@hcsc.local`
-- `auditor@hcsc.local`
-- `executive@hcsc.local`
+Aşağıdaki değişkenler production’da tanımlanmalıdır:
 
-Parola:
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `APP_URL`
+- `SESSION_SECRET`
+- `JWT_SECRET`
+- `TWO_FACTOR_ENCRYPTION_KEY`
+- `RECOVERY_CODE_HASH_KEY`
+- `RESEND_API_KEY`
+- `MAIL_FROM`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 
-```txt
-demo123
-```
+Notlar:
 
-2FA doğrulama kodu:
+- `APP_URL` production’da `https://hcsc.space` olacak şekilde tanımlanmalıdır.
+- `RECOVERY_CODE_HASH_KEY` ayrı tanımlanmalı; `SESSION_SECRET` fallback olarak bırakılmamalıdır.
+- `UPSTASH_*` env yoksa local development için in-memory rate limit fallback çalışır. Production’da merkezi Redis tavsiye edilir.
 
-```txt
-123456
-```
+## Auth ve güvenlik yüzeyleri
 
-## API-first mimari
+- kayıt olma akışı DB-backed çalışır
+- kullanıcı, organization, membership transaction içinde oluşturulur
+- login sonrası TOTP doğrulama zorunludur
+- recovery code ile tek kullanımlık kurtarma girişi desteklenir
+- password reset token’ı hashli tutulur ve Resend ile e-posta gönderilir
+- rate limit auth yüzeylerinde endpoint bazlı uygulanır
 
-Frontend store korunur, ancak primary source backend API’dir.
+## Team management
 
-- API başarılıysa state DB’den hydrate olur
-- API başarısızsa kontrollü yerel fallback korunur
-- organization scope client değil backend session context ile çözülür
+Settings içinde:
 
-## Backend engine’ler
-
-- Risk Engine: asset risk skorunu policy + event + deception sinyaline göre hesaplar
-- Zero Trust Engine: access request kararını server-side üretir
-- Deception Engine: güvenli deception akışı ve trap olaylarını üretir
-- Event / SOAR Engine: playbook, timeline, containment ve audit akışını yönetir
-- Compliance Engine: NIST CSF 2.0 / KVKK / GDPR / ISO 27001 görünümünü hesaplar
-- Report Engine: kalıcı snapshot tabanlı rapor üretir
-
-## Guided run
-
-`/dashboard` veya `/simulations` üzerinden **Guided Run Başlat** aksiyonu çalıştırıldığında:
-
-1. access request oluşturulur
-2. Zero Trust kararı üretilir
-3. deception alarmı üretilir
-4. compliance yeniden hesaplanır
-5. report oluşturulur
-6. audit log ve notification kayıtları güncellenir
+- çalışma alanı üyeleri listelenir
+- yeni davet gönderilebilir
+- bekleyen davetler görülebilir ve iptal edilebilir
+- roller güncellenebilir
+- son aktif `Security Admin` korunur
+- üyelik kaldırma organization scope içinde çalışır
 
 ## Trap endpoint etik sınırı
 
@@ -102,9 +97,7 @@ Frontend store korunur, ancak primary source backend API’dir.
 - gerçek backend kaynağına proxy olmaz
 - exploit çalıştırmaz
 - hack-back yapmaz
-- saldırgana saldırmaz
-
-Yalnızca güvenli deception logging, erken uyarı, audit ve notification üretir.
+- yalnızca güvenli deception logging, audit ve notification üretir
 
 ## Report print flow
 
@@ -119,12 +112,24 @@ npm run lint
 npm run build
 ```
 
+## Deploy sonrası manuel smoke test
+
+- register → 2FA setup → recovery codes → onboarding → dashboard
+- logout → login → TOTP verify → dashboard
+- logout → login → recovery code verify → dashboard
+- forgot password → mail → reset password → new password login
+- settings → recovery codes regenerate
+- settings → team invite
+- settings → role update
+- auth endpoint rate limit 429
+- `/dashboard`, `/settings`, `/reports/[id]/print`
+- mobil auth ekranları ve settings team paneli
+
 ## Deployment notu
 
-Vercel deploy için Prisma Client generate zinciri önemlidir.
-
-- `postinstall` veya build öncesi `prisma generate` çalışmalıdır
-- final production cleanup ve deploy doğrulaması foundation sonrası ayrıca yapılacaktır
+- Vercel deploy zincirinde `prisma generate` çalıştığından emin olun.
+- Upstash timeout/fallback kod tarafında hazırdır; gerçek Redis-backed smoke test production env ile yapılmalıdır.
+- Resend mail teslimatı için `RESEND_API_KEY` ve `MAIL_FROM` zorunludur.
 
 ## Güvenlik ve etik not
 

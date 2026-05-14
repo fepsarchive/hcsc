@@ -89,7 +89,15 @@ export type UserRole =
   | "Auditor"
   | "Executive";
 
+export type TeamRoleKey =
+  | "security_admin"
+  | "cloud_security_analyst"
+  | "compliance_officer"
+  | "auditor"
+  | "executive";
+
 export type UserStatus = "active" | "invited" | "suspended";
+export type TeamInviteStatus = "pending" | "accepted" | "revoked" | "expired";
 export type Permission =
   | "view_dashboard"
   | "view_assets"
@@ -175,7 +183,12 @@ export type AuditAction =
   | "simulation_started"
   | "simulation_completed"
   | "unauthorized_action_attempt"
-  | "settings_updated";
+  | "settings_updated"
+  | "team_invite_created"
+  | "team_invite_revoked"
+  | "team_invite_accepted"
+  | "team_member_role_updated"
+  | "team_member_removed";
 
 export interface AuditLogItem {
   id: string;
@@ -512,6 +525,37 @@ export interface ToastMessage {
   description: string;
   tone: "info" | "success" | "warning" | "critical" | "deception" | "policy" | "compliance";
   actionLabel?: string;
+}
+
+export interface TeamMemberRecord {
+  membershipId: string;
+  userId: string;
+  name: string;
+  email: string;
+  role: TeamRoleKey;
+  roleLabel: UserRole;
+  status: UserStatus;
+  department: string;
+  avatarInitials: string;
+  joinedAt: string;
+  lastLoginAt: string | null;
+  isProtectedAdmin: boolean;
+}
+
+export interface TeamInviteRecord {
+  id: string;
+  email: string;
+  role: TeamRoleKey;
+  roleLabel: UserRole;
+  status: TeamInviteStatus;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+  invitedBy: {
+    id: string;
+    name: string;
+    email?: string;
+  } | null;
 }
 
 export interface DemoEnvironment {

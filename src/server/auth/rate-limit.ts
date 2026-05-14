@@ -54,6 +54,7 @@ type UpstashPipelineResponse = Array<{
 }>;
 
 const rateLimitStore = new Map<string, RateLimitStoreEntry>();
+const UPSTASH_TIMEOUT_MS = 2000;
 const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitWindow[]> = {
   login: [
     { name: "email_ip", scope: "email_ip", limit: 5, windowMs: 1000 * 60 * 5 },
@@ -126,22 +127,41 @@ function toSeconds(durationMs: number) {
 function logMissingUpstashWarning() {
   if (process.env.NODE_ENV === "production" && !hasLoggedMissingUpstashWarning) {
     hasLoggedMissingUpstashWarning = true;
-    console.warn("[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN tanımlı değil, production ortamında in-memory fallback kullanılıyor.");
+    console.warn("[rate-limit]", {
+      event: "rate_limit_fallback",
+      provider: "memory",
+      mode: "missing_config",
+      reason: "upstash_env_missing",
+      environment: process.env.NODE_ENV,
+    });
   }
 }
 
 function logDisabledProductionWarning() {
   if (process.env.NODE_ENV === "production" && !hasLoggedDisabledProductionWarning) {
     hasLoggedDisabledProductionWarning = true;
-    console.warn("[rate-limit] RATE_LIMIT_DISABLED production ortamında görmezden gelindi.");
+    console.warn("[rate-limit]", {
+      event: "rate_limit_bypass_rejected",
+      provider: "memory",
+      mode: "production",
+      reason: "rate_limit_disabled_ignored",
+      environment: process.env.NODE_ENV,
+    });
   }
 }
 
-function logUpstashFailure(reason: string) {
-  if (!upstashErrorWarnings.has(reason)) {
-    upstashErrorWarnings.add(reason);
-    console.warn("[rate-limit] Upstash rate limit çağrısı başarısız oldu, in-memory fallback kullanılıyor.", {
+function logUpstashFailure(reason: string, policyName?: string) {
+  const warningKey = `${policyName ?? "unknown"}:${reason}`;
+
+  if (!upstashErrorWarnings.has(warningKey)) {
+    upstashErrorWarnings.add(warningKey);
+    console.warn("[rate-limit]", {
+      event: "rate_limit_fallback",
+      provider: "upstash",
+      mode: "fallback_to_memory",
       reason,
+      policy: policyName ?? "unknown",
+      environment: process.env.NODE_ENV,
     });
   }
 }
@@ -235,19 +255,35 @@ function consumeMemoryRateLimit(input: ConsumeRateLimitInput): RateLimitDecision
 
 async function consumeUpstashRateLimit(input: ConsumeRateLimitInput): Promise<RateLimitDecision> {
   const currentTime = now();
-  const response = await fetch(`${process.env.UPSTASH_REDIS_REST_URL}/pipeline`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify([
-      ["INCR", input.key],
-      ["PEXPIRE", input.key, String(input.windowMs), "NX"],
-      ["PTTL", input.key],
-    ]),
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort("upstash_timeout"), UPSTASH_TIMEOUT_MS);
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${process.env.UPSTASH_REDIS_REST_URL}/pipeline`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        ["INCR", input.key],
+        ["PEXPIRE", input.key, String(input.windowMs), "NX"],
+        ["PTTL", input.key],
+      ]),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error("upstash_timeout");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     throw new Error(`upstash_http_${response.status}`);
@@ -275,7 +311,7 @@ async function consumeUpstashRateLimit(input: ConsumeRateLimitInput): Promise<Ra
   };
 }
 
-async function consumeDistributedRateLimit(input: ConsumeRateLimitInput) {
+async function consumeDistributedRateLimit(input: ConsumeRateLimitInput, policyName: RateLimitPolicyName) {
   if (isRateLimitDisabled()) {
     if (process.env.NODE_ENV === "production") {
       logDisabledProductionWarning();
@@ -300,7 +336,7 @@ async function consumeDistributedRateLimit(input: ConsumeRateLimitInput) {
   try {
     return await consumeUpstashRateLimit(input);
   } catch (error) {
-    logUpstashFailure(error instanceof Error ? error.message : "unknown_upstash_error");
+    logUpstashFailure(error instanceof Error ? error.message : "unknown_upstash_error", policyName);
     return consumeMemoryRateLimit(input);
   }
 }
@@ -320,7 +356,7 @@ export async function consumeRateLimitPolicy(
         key: createWindowKey(policyName, window, context),
         limit: window.limit,
         windowMs: window.windowMs,
-      });
+      }, policyName);
 
       return {
         ...decision,
