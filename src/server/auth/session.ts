@@ -116,6 +116,14 @@ export async function markSessionTwoFactorVerified(sessionId: string) {
       is2FAVerified: true,
       lastSeenAt: new Date(),
     },
+    include: {
+      user: {
+        include: {
+          twoFactorSecret: true,
+        },
+      },
+      organization: true,
+    },
   });
 }
 

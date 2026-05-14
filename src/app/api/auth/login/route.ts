@@ -5,6 +5,7 @@ import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/perm
 import { verifyPassword } from "@/server/auth/password";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { buildRequestMeta, createAuthAuditLog, createPendingSession, setSessionCookie } from "@/server/auth/session";
+import { isTwoFactorEnrolled } from "@/server/auth/two-factor";
 import { prisma } from "@/server/db/prisma";
 
 const loginSchema = z.object({
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
+      twoFactorSecret: true,
       memberships: {
         include: {
           organization: true,
@@ -150,6 +152,11 @@ export async function POST(request: NextRequest) {
       user: mapDbUserToAppUser(user),
       organization: mapOrganizationToProfile(membership.organization),
       onboardingCompleted: membership.organization.onboardingCompleted,
+      twoFactorEnrolled: isTwoFactorEnrolled({
+        secret: user.twoFactorSecret?.secret,
+        enabledAt: user.twoFactorSecret?.enabledAt,
+        enrolledAt: user.twoFactorSecret?.enrolledAt,
+      }),
     },
     meta: { requestId: meta.requestId },
     error: null,

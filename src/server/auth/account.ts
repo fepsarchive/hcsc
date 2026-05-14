@@ -6,6 +6,7 @@ import { prisma } from "@/server/db/prisma";
 import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
 import { hashPassword } from "@/server/auth/password";
 import { createAuthAuditLog, createPendingSession } from "@/server/auth/session";
+import { createTwoFactorEnrollmentSecret } from "@/server/auth/two-factor";
 import { recalculateAndPersistCompliance } from "@/server/services/compliance/compliance-service";
 import { createNotification, notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
 import { generateOrganizationReport } from "@/server/services/reports/reports-service";
@@ -42,10 +43,6 @@ async function createUniqueOrganizationSlug(name: string) {
 
 function hashOpaqueToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
-}
-
-function generateTwoFactorSecret() {
-  return randomBytes(20).toString("hex");
 }
 
 async function provisionStarterWorkspace(organizationId: string) {
@@ -313,6 +310,7 @@ export async function registerWorkspaceAccount(input: {
 
   const slug = await createUniqueOrganizationSlug(input.companyName);
   const rawToken = randomBytes(32).toString("hex");
+  const twoFactorSecret = createTwoFactorEnrollmentSecret();
 
   try {
     const created = await prisma.$transaction(async (tx) => {
@@ -343,7 +341,7 @@ export async function registerWorkspaceAccount(input: {
             .map((part) => part.charAt(0).toUpperCase())
             .join(""),
           status: "active",
-          mfaEnabled: true,
+          mfaEnabled: false,
         },
       });
 
@@ -358,10 +356,9 @@ export async function registerWorkspaceAccount(input: {
       await tx.twoFactorSecret.create({
         data: {
           userId: user.id,
-          secret: generateTwoFactorSecret(),
+          secret: twoFactorSecret.secret,
           issuer: "Hybrid Cloud Security Console",
           label: user.email,
-          enabledAt: new Date(),
         },
       });
 

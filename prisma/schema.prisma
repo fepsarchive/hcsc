@@ -294,6 +294,9 @@ model TwoFactorSecret {
   issuer    String
   label     String
   enabledAt DateTime?
+  enrolledAt DateTime?
+  lastVerifiedAt DateTime?
+  lastVerifiedStep Int?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 

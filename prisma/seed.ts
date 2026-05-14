@@ -340,6 +340,8 @@ async function upsertUsers() {
         issuer: "Hybrid Cloud Security Console",
         label: user.email,
         enabledAt: NOW,
+        enrolledAt: NOW,
+        lastVerifiedAt: NOW,
       },
       create: {
         userId: user.id,
@@ -347,6 +349,8 @@ async function upsertUsers() {
         issuer: "Hybrid Cloud Security Console",
         label: user.email,
         enabledAt: NOW,
+        enrolledAt: NOW,
+        lastVerifiedAt: NOW,
       },
     });
   }

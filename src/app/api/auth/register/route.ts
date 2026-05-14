@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     user: result.user,
     organization: result.organization,
     onboardingCompleted: result.onboardingCompleted,
+    twoFactorEnrolled: false,
   });
 
   setSessionCookie(response, result.rawToken);

@@ -102,6 +102,7 @@ type AuthActionResult = {
   success: boolean;
   error?: string;
   message?: string;
+  redirectTo?: string;
 };
 
 type RegisterAccountPayload = {
@@ -2153,6 +2154,7 @@ const actions: Pick<
 
     return {
       success: true,
+      redirectTo: currentMeta.onboardingCompleted ? "/dashboard" : "/onboarding",
     };
   },
 
@@ -2280,7 +2282,10 @@ const actions: Pick<
             result: "success",
             details: "2FA doğrulaması tamamlandı.",
           });
-          return { success: true };
+          return {
+            success: true,
+            redirectTo: result.data.onboardingCompleted ? "/dashboard" : "/onboarding",
+          };
         }
 
         if (!result.success) {

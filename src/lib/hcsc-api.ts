@@ -68,7 +68,22 @@ export type AuthUserPayload = {
   user: AppUser | null;
   organization: OrganizationProfile | null;
   onboardingCompleted: boolean;
+  twoFactorEnrolled?: boolean;
+  nextPath?: string;
 };
+
+export type TwoFactorSetupPayload =
+  | {
+      mode: "verify";
+      alreadyEnrolled: true;
+    }
+  | {
+      mode: "setup";
+      alreadyEnrolled: false;
+      issuer: string;
+      manualSecret: string;
+      otpauthUrl: string;
+    };
 
 export type RegisterAccountPayload = {
   fullName: string;
@@ -336,6 +351,17 @@ export function resetPassword(payload: ResetPasswordPayload) {
   return request<{ success: boolean; message: string }>("/api/auth/reset-password", {
     method: "POST",
     body: payload,
+  });
+}
+
+export function getTwoFactorSetup() {
+  return request<TwoFactorSetupPayload>("/api/auth/2fa/setup", { method: "GET" });
+}
+
+export function confirmTwoFactorSetup(code: string) {
+  return request<AuthUserPayload>("/api/auth/2fa/confirm", {
+    method: "POST",
+    body: { code },
   });
 }
 
