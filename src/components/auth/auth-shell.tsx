@@ -13,14 +13,28 @@ type AuthShellProps = {
   children: React.ReactNode;
   footer?: React.ReactNode;
   eyebrow?: string;
-  sideTitle?: string;
+  sideTitle?: React.ReactNode;
   sideDescription?: string;
+  sideHighlights?: Array<{
+    title: string;
+    description: string;
+  }>;
+  sideFooter?: React.ReactNode;
 };
 
-const platformHighlights = [
-  "Zero Trust kararları ve erişim talepleri",
-  "Deception, olay yönetimi ve SOAR akışları",
-  "Uyumluluk, raporlama ve executive briefing görünümü",
+const defaultPlatformHighlights = [
+  {
+    title: "Zero Trust Operations",
+    description: "Kimlik, cihaz güveni ve veri sınıfı aynı karar akışında birleşir.",
+  },
+  {
+    title: "Active Defense",
+    description: "Deception, olay yönetimi ve yanıt otomasyonları tek panelde toplanır.",
+  },
+  {
+    title: "Reporting & Audit",
+    description: "Uyumluluk, rapor çıktıları ve denetim izleri sürekli görünür kalır.",
+  },
 ];
 
 export function AuthShell({
@@ -32,35 +46,42 @@ export function AuthShell({
   eyebrow = "Secure Access",
   sideTitle = "Gerçek SaaS paneli akışı için güvenli başlangıç",
   sideDescription = "HCSC; kimlik doğrulama, onboarding, aktif savunma ve operasyon görünürlüğünü aynı deneyimde birleştirir.",
+  sideHighlights = defaultPlatformHighlights,
+  sideFooter,
 }: AuthShellProps) {
   return (
     <main className="min-h-svh bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_24%),var(--background)] px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100svh-2.5rem)] w-full max-w-[1480px] gap-5 xl:grid-cols-[1.05fr_minmax(420px,520px)]">
-        <section className="hidden min-w-0 overflow-hidden rounded-[32px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_82%,transparent)] p-8 shadow-[var(--panel-shadow)] backdrop-blur xl:flex xl:flex-col xl:justify-between">
+      <div className="mx-auto grid min-h-[calc(100svh-2.5rem)] w-full max-w-[1500px] gap-4 xl:grid-cols-[minmax(0,1.28fr)_minmax(420px,500px)]">
+        <section className="hidden min-w-0 overflow-hidden p-10 xl:flex xl:flex-col xl:justify-between xl:px-10 xl:py-12">
           <div>
             <Badge variant="outline" className="gap-2">
               <ShieldCheckIcon className="size-4" />
               {badge}
             </Badge>
-            <h1 className="mt-8 max-w-3xl text-balance text-5xl font-semibold tracking-tight text-[var(--text-primary)]">
+            <h1 className="mt-10 max-w-[50rem] text-balance text-[3.45rem] font-semibold leading-[0.98] tracking-tight text-[var(--text-primary)] xl:text-[4.25rem]">
               {sideTitle}
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-9 text-[var(--text-secondary)]">{sideDescription}</p>
+            <p className="mt-8 max-w-[44rem] text-[1.06rem] leading-9 text-[var(--text-secondary)]">{sideDescription}</p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            {platformHighlights.map((item) => (
-              <div
-                key={item}
-                className="rounded-3xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-elevated)_82%,transparent)] p-5"
-              >
-                <div className="flex size-10 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
-                  <SparklesIcon className="size-4" />
+          {sideFooter ? (
+            <div className="pt-14">{sideFooter}</div>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-3">
+              {sideHighlights.map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-[28px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,transparent)] p-5"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
+                    <SparklesIcon className="size-4" />
+                  </div>
+                  <p className="mt-4 text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                  <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">{item.description}</p>
                 </div>
-                <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">{item}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="flex min-w-0 items-center justify-center">

@@ -18,16 +18,17 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useDemo();
+  const isDevelopment = process.env.NODE_ENV === "development";
   const registeredEmail = searchParams.get("email");
   const registrationCompleted = searchParams.get("registered") === "1";
 
-  const [email, setEmail] = useState(registeredEmail ?? mockAuthAccounts[0]?.email ?? "");
-  const [password, setPassword] = useState("demo123");
+  const [email, setEmail] = useState(registeredEmail ?? (isDevelopment ? (mockAuthAccounts[0]?.email ?? "") : ""));
+  const [password, setPassword] = useState(isDevelopment ? "demo123" : "");
   const [rememberSession, setRememberSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const showcasedAccounts = useMemo(() => mockAuthAccounts.slice(0, 3), []);
+  const showcasedAccounts = useMemo(() => (isDevelopment ? mockAuthAccounts.slice(0, 3) : []), [isDevelopment]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -59,6 +60,34 @@ export default function LoginPage() {
       eyebrow="Secure Login"
       title="Oturum aç"
       description="HCSC çalışma alanına erişmek için hesabınla giriş yap. Parola doğrulamasından sonra ikinci faktör adımıyla oturum tamamlanır."
+      sideTitle={
+        <>
+          Active Defense &amp; Zero Trust
+          <br />
+          Cloud Security Platform
+        </>
+      }
+      sideDescription="Hibrit bulut veri varlıklarını sınıflandıran, erişim taleplerini Zero Trust ile değerlendiren, deception varlıklarını yöneten ve SIEM/SOAR olaylarını aynı konsolda birleştiren güvenli tez prototipi."
+      sideFooter={
+        <div className="grid max-w-[42rem] gap-4 sm:grid-cols-2">
+          <div className="rounded-[28px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-elevated)_88%,transparent)] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+              Zero Trust Flow
+            </p>
+            <p className="mt-4 text-sm leading-8 text-[var(--text-secondary)]">
+              Erişim talepleri, risk skoru ve policy kontrolleriyle doğrulanır.
+            </p>
+          </div>
+          <div className="rounded-[28px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-elevated)_88%,transparent)] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+              Deception &amp; SOAR
+            </p>
+            <p className="mt-4 text-sm leading-8 text-[var(--text-secondary)]">
+              Sahte varlık sinyalleri olay yönetimi ve müdahale akışlarına bağlanır.
+            </p>
+          </div>
+        </div>
+      }
       footer={
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -68,33 +97,35 @@ export default function LoginPage() {
               secondaryHref="/forgot-password"
               secondaryLabel="Şifremi unuttum"
             />
-            <Badge variant="outline">Hazır erişim profilleri</Badge>
+            {isDevelopment ? <Badge variant="outline">Hazır erişim profilleri</Badge> : null}
           </div>
 
-          <div className="grid gap-2">
-            {showcasedAccounts.map((account) => (
-              <button
-                key={account.id}
-                type="button"
-                onClick={() => {
-                  setEmail(account.email);
-                  setPassword(account.password);
-                  setError(null);
-                }}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-3 text-left transition hover:bg-[var(--surface)]"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">{account.name}</p>
-                    <p className="truncate text-xs text-[var(--text-secondary)]">{account.role}</p>
+          {isDevelopment ? (
+            <div className="grid gap-2">
+              {showcasedAccounts.map((account) => (
+                <button
+                  key={account.id}
+                  type="button"
+                  onClick={() => {
+                    setEmail(account.email);
+                    setPassword(account.password);
+                    setError(null);
+                  }}
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-3 text-left transition hover:bg-[var(--surface)]"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">{account.name}</p>
+                      <p className="truncate text-xs text-[var(--text-secondary)]">{account.role}</p>
+                    </div>
+                    <Badge variant="outline" className="max-w-full truncate">
+                      {account.email}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="max-w-full truncate">
-                    {account.email}
-                  </Badge>
-                </div>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       }
     >
@@ -125,7 +156,7 @@ export default function LoginPage() {
                 setEmail(event.target.value);
                 setError(null);
               }}
-              placeholder="security.admin@hcsc.local"
+              placeholder="name@company.com"
               autoComplete="email"
               className="h-11 rounded-xl px-3.5"
             />
