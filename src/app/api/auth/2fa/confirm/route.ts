@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireApiAuth } from "@/server/api/require-auth";
 import { apiError, apiOk } from "@/server/api/response";
 import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { createAuthAuditLog } from "@/server/auth/session";
 import { ensureRecoveryCodesForUser } from "@/server/auth/recovery-codes";
 import {
@@ -35,10 +35,9 @@ export async function POST(request: NextRequest) {
     return apiError(auth.context.requestId, 400, "VALIDATION_ERROR", "6 haneli doğrulama kodu bekleniyor.");
   }
 
-  const rateLimit = consumeRateLimit({
-    key: `auth:2fa-confirm:${auth.context.ipAddress ?? "unknown"}:${auth.context.session.id}`,
-    limit: 5,
-    windowMs: 1000 * 60 * 10,
+  const rateLimit = await consumeRateLimitPolicy("two_factor_confirm", {
+    ipAddress: auth.context.ipAddress,
+    sessionId: auth.context.session.id,
   });
 
   if (!rateLimit.allowed) {
@@ -56,19 +55,25 @@ export async function POST(request: NextRequest) {
       device: auth.context.userAgent,
     });
 
-    return apiError(
-      auth.context.requestId,
-      429,
-      "RATE_LIMITED",
-      "Çok fazla 2FA kurulum denemesi yapıldı. Lütfen kısa süre sonra tekrar dene.",
-      { retryAfterSeconds: rateLimit.retryAfterSeconds },
+    return applyRateLimitHeaders(
+      apiError(
+        auth.context.requestId,
+        429,
+        "RATE_LIMITED",
+        "Çok fazla deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.",
+        { retryAfterSeconds: rateLimit.retryAfterSeconds },
+      ),
+      rateLimit,
     );
   }
 
   const twoFactorSecret = auth.context.session.user.twoFactorSecret;
 
   if (!twoFactorSecret) {
-    return apiError(auth.context.requestId, 409, "TWO_FACTOR_SETUP_REQUIRED", "Önce 2FA kurulumunu başlat.");
+    return applyRateLimitHeaders(
+      apiError(auth.context.requestId, 409, "TWO_FACTOR_SETUP_REQUIRED", "Önce 2FA kurulumunu başlat."),
+      rateLimit,
+    );
   }
 
   if (
@@ -78,7 +83,10 @@ export async function POST(request: NextRequest) {
       enrolledAt: twoFactorSecret.enrolledAt,
     })
   ) {
-    return apiError(auth.context.requestId, 409, "TWO_FACTOR_ALREADY_ENROLLED", "Bu hesap için 2FA zaten kurulu.");
+    return applyRateLimitHeaders(
+      apiError(auth.context.requestId, 409, "TWO_FACTOR_ALREADY_ENROLLED", "Bu hesap için 2FA zaten kurulu."),
+      rateLimit,
+    );
   }
 
   const verification = verifyTwoFactorCode({
@@ -101,7 +109,10 @@ export async function POST(request: NextRequest) {
       device: auth.context.userAgent,
     });
 
-    return apiError(auth.context.requestId, 401, "INVALID_2FA_CODE", "Doğrulama kodu hatalı veya süresi dolmuş.");
+    return applyRateLimitHeaders(
+      apiError(auth.context.requestId, 401, "INVALID_2FA_CODE", "Doğrulama kodu hatalı veya süresi dolmuş."),
+      rateLimit,
+    );
   }
 
   if (
@@ -124,7 +135,10 @@ export async function POST(request: NextRequest) {
       device: auth.context.userAgent,
     });
 
-    return apiError(auth.context.requestId, 401, "INVALID_2FA_CODE", "Doğrulama kodu hatalı veya süresi dolmuş.");
+    return applyRateLimitHeaders(
+      apiError(auth.context.requestId, 401, "INVALID_2FA_CODE", "Doğrulama kodu hatalı veya süresi dolmuş."),
+      rateLimit,
+    );
   }
 
   const updatedSession = await persistSuccessfulTwoFactorVerification({
@@ -152,15 +166,18 @@ export async function POST(request: NextRequest) {
     device: auth.context.userAgent,
   });
 
-  return apiOk(auth.context.requestId, {
-    authenticated: true,
-    twoFactorVerified: true,
-    sessionStartedAt: updatedSession.createdAt.toISOString(),
-    user: mapDbUserToAppUser(updatedSession.user),
-    organization: mapOrganizationToProfile(updatedSession.organization),
-    onboardingCompleted: updatedSession.organization.onboardingCompleted,
-    twoFactorEnrolled: true,
-    recoveryCodes: recoveryCodes ?? undefined,
-    nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
-  });
+  return applyRateLimitHeaders(
+    apiOk(auth.context.requestId, {
+      authenticated: true,
+      twoFactorVerified: true,
+      sessionStartedAt: updatedSession.createdAt.toISOString(),
+      user: mapDbUserToAppUser(updatedSession.user),
+      organization: mapOrganizationToProfile(updatedSession.organization),
+      onboardingCompleted: updatedSession.organization.onboardingCompleted,
+      twoFactorEnrolled: true,
+      recoveryCodes: recoveryCodes ?? undefined,
+      nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
+    }),
+    rateLimit,
+  );
 }

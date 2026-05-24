@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { createPasswordResetRequest } from "@/server/auth/account";
 import { apiOk, apiError } from "@/server/api/response";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { buildRequestMeta } from "@/server/auth/session";
 
 const forgotPasswordSchema = z.object({
@@ -51,10 +51,9 @@ export async function POST(request: NextRequest) {
     env: process.env.NODE_ENV,
   });
 
-  const rateLimit = consumeRateLimit({
-    key: `auth:forgot-password:${meta.ipAddress ?? "unknown"}:${normalizedEmail}`,
-    limit: 5,
-    windowMs: 1000 * 60 * 15,
+  const rateLimit = await consumeRateLimitPolicy("forgot_password", {
+    ipAddress: meta.ipAddress,
+    email: normalizedEmail,
   });
 
   console.info("[auth] forgot-password normalized email", {
@@ -64,9 +63,16 @@ export async function POST(request: NextRequest) {
   });
 
   if (!rateLimit.allowed) {
-    return apiOk(meta.requestId, {
-      message: "Eğer bu e-posta ile bir hesap varsa şifre sıfırlama bağlantısı gönderilecektir.",
-    });
+    return applyRateLimitHeaders(
+      apiError(
+        meta.requestId,
+        429,
+        "RATE_LIMITED",
+        "Çok fazla deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.",
+        { retryAfterSeconds: rateLimit.retryAfterSeconds },
+      ),
+      rateLimit,
+    );
   }
 
   const result = await createPasswordResetRequest({
@@ -76,15 +82,18 @@ export async function POST(request: NextRequest) {
     appOrigin: request.nextUrl.origin,
   });
 
-  return apiOk(
-    meta.requestId,
-    {
-      message: result.message,
-    },
-    process.env.NODE_ENV !== "production" && result.resetUrl
-      ? {
-          resetUrl: result.resetUrl,
-        }
-      : undefined,
+  return applyRateLimitHeaders(
+    apiOk(
+      meta.requestId,
+      {
+        message: result.message,
+      },
+      process.env.NODE_ENV !== "production" && result.resetUrl
+        ? {
+            resetUrl: result.resetUrl,
+          }
+        : undefined,
+    ),
+    rateLimit,
   );
 }

@@ -167,6 +167,13 @@ enum UserStatus {
   suspended
 }
 
+enum OrganizationInviteStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
 enum AuditSeverity {
   info
   warning
@@ -211,6 +218,7 @@ model Organization {
   updatedAt            DateTime  @updatedAt
 
   memberships         Membership[]
+  invites             OrganizationInvite[]
   sessions            Session[]
   assets              Asset[]
   identityProfiles    IdentityProfile[]
@@ -244,6 +252,7 @@ model User {
   updatedAt      DateTime   @updatedAt
 
   memberships     Membership[]
+  sentInvites     OrganizationInvite[] @relation("InviteSender")
   sessions        Session[]
   twoFactorSecret TwoFactorSecret?
   recoveryCodes   RecoveryCode[]
@@ -328,6 +337,27 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, usedAt])
+  @@index([expiresAt])
+}
+
+model OrganizationInvite {
+  id              String                   @id @default(cuid())
+  organizationId  String
+  email           String
+  role            UserRole
+  tokenHash       String                   @unique
+  status          OrganizationInviteStatus @default(pending)
+  invitedByUserId String?
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("InviteSender", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, email])
   @@index([expiresAt])
 }
 

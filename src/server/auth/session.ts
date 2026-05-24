@@ -66,6 +66,33 @@ export async function createPendingSession(input: {
   return { rawToken, session };
 }
 
+export async function createVerifiedSession(input: {
+  userId: string;
+  organizationId: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  rawToken?: string;
+}) {
+  const rawToken = input.rawToken ?? randomBytes(32).toString("hex");
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+
+  const session = await prisma.session.create({
+    data: {
+      userId: input.userId,
+      organizationId: input.organizationId,
+      tokenHash,
+      status: "active",
+      is2FAVerified: true,
+      ipAddress: input.ipAddress,
+      userAgent: input.userAgent,
+      expiresAt,
+    },
+  });
+
+  return { rawToken, session };
+}
+
 export async function getSessionContext(rawToken: string | null) {
   if (!rawToken) {
     return null;

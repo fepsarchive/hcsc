@@ -17,6 +17,9 @@ import type {
   SecurityEvent,
   SimulationRunResult,
   SoarAction,
+  TeamInviteRecord,
+  TeamMemberRecord,
+  TeamRoleKey,
 } from "@/types";
 
 type ApiErrorPayload = {
@@ -105,6 +108,18 @@ export type RecoveryCodeStatusPayload = {
   usedCodes: number;
   lastGeneratedAt: string | null;
   hasRecoveryCodes: boolean;
+};
+
+export type TeamInviteCreatePayload = {
+  email: string;
+  role: TeamRoleKey;
+};
+
+export type TeamInviteCreateResult = {
+  success: boolean;
+  invite: TeamInviteRecord;
+  delivery: "sent" | "skipped" | "failed";
+  inviteUrl?: string | null;
 };
 
 export type ResetPasswordPayload = {
@@ -602,4 +617,47 @@ export function getSimulations() {
 
 export function runExecutiveDemo() {
   return request<ExecutiveDemoPayload>("/api/simulations/executive-demo", { method: "POST" });
+}
+
+export function getTeamMembers() {
+  return request<{ members: TeamMemberRecord[] }>("/api/team/members", { method: "GET" });
+}
+
+export function getTeamInvites() {
+  return request<{ invites: TeamInviteRecord[] }>("/api/team/invites", { method: "GET" });
+}
+
+export function createTeamInvite(payload: TeamInviteCreatePayload) {
+  return request<TeamInviteCreateResult>("/api/team/invites", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function revokeTeamInvite(inviteId: string) {
+  return request<{ success: boolean }>("/api/team/invites/revoke", {
+    method: "POST",
+    body: { inviteId },
+  });
+}
+
+export function updateTeamMemberRole(userId: string, role: TeamRoleKey) {
+  return request<{ members: TeamMemberRecord[] }>("/api/team/members/update-role", {
+    method: "POST",
+    body: { userId, role },
+  });
+}
+
+export function disableTeamMember(userId: string) {
+  return request<{ members: TeamMemberRecord[] }>("/api/team/members/disable", {
+    method: "POST",
+    body: { userId },
+  });
+}
+
+export function acceptTeamInvite(token: string) {
+  return request<{ success: boolean; organization: OrganizationProfile }>("/api/team/accept-invite", {
+    method: "POST",
+    body: { token },
+  });
 }

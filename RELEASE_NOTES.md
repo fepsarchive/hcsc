@@ -1,62 +1,59 @@
-# HCSC v2 Foundation Release Notes
+# HCSC v2 Production Checkpoint
 
-## Genel özet
+## Tamamlanan ana paketler
 
-HCSC, v2 foundation aşamasında kalıcı veri, backend API, auth/session, engine ve print/trap omurgasını tamamlayarak ürün seviyesine taşındı.
+- Prisma + PostgreSQL foundation
+- auth / session / 2FA persistence
+- core API + persistence
+- backend engines
+- frontend API adapter
+- trap endpoint + print flow
+- auth hardening
+- gerçek TOTP 2FA enrollment
+- recovery codes
+- Resend password reset
+- distributed rate limit
+- team management foundation
+- security headers + error UI
 
-## Paket 1 — Prisma + PostgreSQL + Schema + Seed
+## Auth hardening tamamlandı
 
-- Prisma + PostgreSQL foundation kuruldu
-- organization-scoped schema oluşturuldu
-- idempotent seed ve başlangıç verileri eklendi
-- setup ve migration dokümantasyonu hazırlandı
+- DB-backed register
+- transaction-safe user / organization / membership oluşturma
+- session cookie güvenliği
+- TOTP 2FA enrollment
+- recovery code kurtarma akışı
+- Resend password reset maili
+- auth endpoint rate limiting
 
-## Paket 2 — Auth / Session / 2FA Persistence
+## Required env vars
 
-- backend auth helper’ları eklendi
-- login / verify-2fa / logout / me endpointleri eklendi
-- session cookie DB-backed hale geldi
-- yerel geliştirme parolası ve geçici 2FA doğrulama akışı korundu
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `APP_URL`
+- `SESSION_SECRET`
+- `JWT_SECRET`
+- `TWO_FACTOR_ENCRYPTION_KEY`
+- `RECOVERY_CODE_HASH_KEY`
+- `RESEND_API_KEY`
+- `MAIL_FROM`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 
-## Paket 3 — Core API + Persistence
+## Manual smoke test checklist
 
-- assets, identities, access requests, events, deception, compliance, reports, audit, notifications, settings ve simulations endpointleri eklendi
-- ortak response envelope standardı uygulandı
-- organization scope ve 2FA koruması route seviyesinde standardize edildi
-
-## Paket 4 — Backend Engines
-
-- Risk Engine server-side çalışır hale geldi
-- Zero Trust kararları backend’e taşındı
-- Deception, Event/SOAR, Compliance ve Report engine’leri backend service katmanına alındı
-- guided run orchestration server-side tamamlandı
-
-## Paket 5 — Frontend API Adapter + UI Bağlantıları
-
-- store API-first hydrate olacak şekilde güncellendi
-- dashboard, assets, events, deception, reports, audit logs, notifications ve settings API’den okunur hale geldi
-- yerel fallback korundu
-- v1 UI/UX dili bozulmadı
-
-## Paket 6 — Trap Endpoint + Report Print + Release Hardening
-
-- güvenli deception trap endpoint eklendi
-- report print payload API eklendi
-- print route DB snapshot tabanlı hale getirildi
-- print aksiyonu audit log’a bağlandı
-- README, release notes ve v2 status dokümanları güncellendi
-
-## v1’den v2’ye gelen temel değişiklikler
-
-- yerel fallback merkezli yapıdan kalıcı DB-backed foundation’a geçildi
-- auth/session backend’e taşındı
-- domain verileri API üzerinden yönetilir hale geldi
-- iş kuralları frontend’den backend engine katmanına alındı
-- print ve trap gibi release-kritik yüzeyler server-side kontrollü hale geldi
+- register → 2FA setup → recovery codes → onboarding → dashboard
+- logout → login → TOTP verify → dashboard
+- logout → login → recovery code verify → dashboard
+- forgot password → reset password → new password login
+- settings → recovery codes regenerate
+- settings → team invite / role update / revoke
+- auth rate limit 429
+- mobile auth and settings layouts
 
 ## Bilinen sınırlar
 
-- production deploy için Prisma/Vercel zinciri final cleanup ile tekrar doğrulanmalı
-- bazı ekranlarda yerel fallback halen korundu
-- gerçek SSO, gerçek TOTP sağlayıcısı ve dış sistem connector’ları foundation sonrası genişletilecek
-- trap endpoint etik olarak yalnızca güvenli deception logging yüzeyidir
+- gerçek Upstash production env ile canlı smoke test bu local oturumda yapılamadı
+- invite acceptance akışı ilk MVP sürümünde tek aktif organization session modeline göre çalışır
+- recovery codes için opsiyonel expiry politikası henüz yok
+- tam mobil görsel QA için gerçek cihaz tarayıcı turu önerilir

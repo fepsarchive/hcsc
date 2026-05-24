@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { requireApiAuth } from "@/server/api/require-auth";
 import { apiOk, apiError } from "@/server/api/response";
 import { replaceRecoveryCodesForUser, getRecoveryCodeStatus } from "@/server/auth/recovery-codes";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { createAuthAuditLog } from "@/server/auth/session";
 
 export async function POST(request: NextRequest) {
@@ -16,19 +16,21 @@ export async function POST(request: NextRequest) {
     return auth.response;
   }
 
-  const rateLimit = consumeRateLimit({
-    key: `auth:recovery-codes-regenerate:${auth.context.ipAddress ?? "unknown"}:${auth.context.session.userId}`,
-    limit: 3,
-    windowMs: 1000 * 60 * 15,
+  const rateLimit = await consumeRateLimitPolicy("recovery_regenerate", {
+    ipAddress: auth.context.ipAddress,
+    userId: auth.context.session.userId,
   });
 
   if (!rateLimit.allowed) {
-    return apiError(
-      auth.context.requestId,
-      429,
-      "RATE_LIMITED",
-      "Çok fazla recovery code yenileme denemesi yapıldı. Lütfen kısa süre sonra tekrar dene.",
-      { retryAfterSeconds: rateLimit.retryAfterSeconds },
+    return applyRateLimitHeaders(
+      apiError(
+        auth.context.requestId,
+        429,
+        "RATE_LIMITED",
+        "Çok fazla deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.",
+        { retryAfterSeconds: rateLimit.retryAfterSeconds },
+      ),
+      rateLimit,
     );
   }
 
@@ -51,8 +53,11 @@ export async function POST(request: NextRequest) {
     device: auth.context.userAgent,
   });
 
-  return apiOk(auth.context.requestId, {
-    recoveryCodes,
-    status,
-  });
+  return applyRateLimitHeaders(
+    apiOk(auth.context.requestId, {
+      recoveryCodes,
+      status,
+    }),
+    rateLimit,
+  );
 }

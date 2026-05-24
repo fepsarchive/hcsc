@@ -2,35 +2,65 @@
 
 ## Tamamlanan paketler
 
-1. Paket 1 — Prisma + PostgreSQL + Schema + Seed
-2. Paket 2 — Auth / Session / 2FA Persistence
-3. Paket 3 — Core API + Persistence
-4. Paket 4 — Backend Engines
-5. Paket 5 — Frontend API Adapter + UI Bağlantıları
-6. Paket 6 — Trap Endpoint + Report Print + Release Hardening
+1. Prisma + PostgreSQL + Seed
+2. Auth / Session / 2FA
+3. Core API + Persistence
+4. Backend Engines
+5. Frontend API Adapter
+6. Trap Endpoint + Report Print
+7. Auth Hardening
+8. TOTP Enrollment
+9. Recovery Codes
+10. Resend Password Reset
+11. Distributed Rate Limit
+12. Production Readiness Final Pack
 
-## Mevcut durum
+## Production readiness özeti
 
 - DB persistence completed
 - Auth / session completed
-- Core API completed
-- Backend engines completed
-- Frontend API adapter completed
-- Trap endpoint completed
-- Report print payload completed
+- TOTP 2FA completed
+- Recovery codes completed
+- Password reset mail completed
+- Distributed rate limit completed
+- Team management foundation completed
+- Security headers completed
+- Error / not-found UX completed
 
-## Deploy blocker notu
+## Production env checklist
 
-- Vercel production deploy zincirinde Prisma Client generate davranışı final production cleanup aşamasında tekrar doğrulanmalı
-- Local lint/build ve local DB seed akışı foundation boyunca temiz tutuldu
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `APP_URL`
+- `SESSION_SECRET`
+- `JWT_SECRET`
+- `TWO_FACTOR_ENCRYPTION_KEY`
+- `RECOVERY_CODE_HASH_KEY`
+- `RESEND_API_KEY`
+- `MAIL_FROM`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 
-## Production cleanup checklist
+## Deploy sonrası smoke test
 
-- Vercel build sırasında Prisma generate zincirini yeniden doğrula
-- production env değişkenlerini son kez gözden geçir
-- Neon SSL mode yapılandırmasını netleştir
-- seed bağımlılıklarının production build type-check’i etkilemediğini doğrula
-- report print route ve trap endpoint için production smoke test yap
+- register
+- 2FA setup
+- recovery codes
+- onboarding
+- login
+- forgot password
+- reset password
+- rate limit 429
+- settings security panel
+- settings team invite / revoke / role update
+- dashboard / settings / print route
+
+## Rollback plan
+
+- son stabil commit’e dön
+- Vercel previous deployment rollback kullan
+- yeni env değişikliklerini önce staging benzeri ortamda geri al
+- mail ve Redis env’lerini tek tek doğrula
 
 ## Security / ethics note
 
@@ -42,13 +72,9 @@ HCSC deception yüzeyleri:
 - hack-back yapmaz
 - saldırgana saldırmaz
 
-Trap endpoint yalnızca güvenli gözlem, alarm, audit ve notification üretir.
+## Kalan TODO’lar
 
-## Next roadmap önerisi
-
-1. Production deploy cleanup
-2. Real TOTP / stronger password hashing uplift
-3. External connector foundation
-4. Background jobs ve scheduled reports
-5. Advanced tenant admin ve billing foundation
-6. Observability / tracing / release monitoring
+- Upstash production env ile canlı smoke test
+- multi-organization switcher UX
+- invite acceptance sonrası daha gelişmiş organization selection akışı
+- gerçek cihazda mobil görsel QA
