@@ -284,6 +284,7 @@ function createInitialMeta(): StoreMeta {
     auth: {
       hydrated: false,
       isAuthenticated: false,
+      requiresTwoFactor: false,
       is2FAVerified: false,
       currentUserId: null,
       sessionStartedAt: null,
@@ -334,6 +335,7 @@ function readPersistedAuthMeta() {
 
 type AuthApiPayload = {
   authenticated: boolean;
+  requiresTwoFactor?: boolean;
   twoFactorVerified: boolean;
   sessionStartedAt: string | null;
   user: AppUser | null;
@@ -342,6 +344,7 @@ type AuthApiPayload = {
   twoFactorEnrolled?: boolean;
   recoveryCodes?: string[];
   nextPath?: string;
+  redirectTo?: string;
   permissions?: Permission[];
 };
 
@@ -371,6 +374,7 @@ function applyServerAuthPayload(data: AuthApiPayload | null) {
       auth: {
         hydrated: true,
         isAuthenticated: false,
+        requiresTwoFactor: data?.requiresTwoFactor ?? false,
         is2FAVerified: false,
         currentUserId: null,
         sessionStartedAt: null,
@@ -387,6 +391,7 @@ function applyServerAuthPayload(data: AuthApiPayload | null) {
     auth: {
       hydrated: true,
       isAuthenticated: data.authenticated,
+      requiresTwoFactor: data.requiresTwoFactor ?? false,
       is2FAVerified: data.twoFactorVerified,
       currentUserId: data.user.id,
       sessionStartedAt: data.sessionStartedAt,
@@ -2130,6 +2135,7 @@ const actions: Pick<
       auth: {
         hydrated: true,
         isAuthenticated: true,
+        requiresTwoFactor: true,
         is2FAVerified: false,
         currentUserId: account.id,
         sessionStartedAt: null,
@@ -2157,7 +2163,7 @@ const actions: Pick<
 
     return {
       success: true,
-      redirectTo: currentMeta.onboardingCompleted ? "/dashboard" : "/onboarding",
+      redirectTo: account.isSystemOwner ? "/admin" : currentMeta.onboardingCompleted ? "/dashboard" : "/onboarding",
     };
   },
 
@@ -2257,7 +2263,7 @@ const actions: Pick<
   },
 
   async verify2FA(code, method = "totp") {
-    if (currentMeta.auth.isAuthenticated) {
+    if (currentMeta.auth.isAuthenticated || currentMeta.auth.requiresTwoFactor) {
       try {
         const response = await fetch("/api/auth/verify-2fa", {
           method: "POST",
@@ -2287,7 +2293,10 @@ const actions: Pick<
           });
           return {
             success: true,
-            redirectTo: result.data.onboardingCompleted ? "/dashboard" : "/onboarding",
+            redirectTo:
+              result.data.redirectTo ??
+              result.data.nextPath ??
+              (result.data.onboardingCompleted ? "/dashboard" : "/onboarding"),
           };
         }
 
@@ -2359,6 +2368,7 @@ const actions: Pick<
         ...currentMeta.auth,
         hydrated: true,
         isAuthenticated: true,
+        requiresTwoFactor: false,
         is2FAVerified: true,
         sessionStartedAt: now,
         lastLoginAt: now,
@@ -2385,6 +2395,7 @@ const actions: Pick<
 
     return {
       success: true,
+      redirectTo: currentUser.isSystemOwner ? "/admin" : currentMeta.onboardingCompleted ? "/dashboard" : "/onboarding",
     };
   },
 
@@ -2407,6 +2418,7 @@ const actions: Pick<
       auth: {
         hydrated: true,
         isAuthenticated: false,
+        requiresTwoFactor: false,
         is2FAVerified: false,
         currentUserId: null,
         sessionStartedAt: null,

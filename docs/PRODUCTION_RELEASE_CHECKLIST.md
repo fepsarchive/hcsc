@@ -13,6 +13,7 @@
 - `MAIL_FROM`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
+- `SYSTEM_OWNER_EMAIL` veya `SYSTEM_OWNER_USER_ID`
 
 ## Build ve veri hazırlığı
 
@@ -28,6 +29,8 @@
 - logout → login → TOTP verify → dashboard
 - logout → login → recovery code verify → dashboard
 - forgot password → mail → reset password → new password login
+- system owner login → 2FA verify → `/admin`
+- normal user login → `/dashboard`, `/admin` erişimi reddedilir
 
 ## Security smoke test
 
@@ -36,6 +39,8 @@
 - auth rate limit 429
 - `GET /api/auth/me`
 - `GET /api/recovery-codes/status`
+- normal user ile `GET /api/admin/system-health` → 403
+- system owner kendi hesabını pasifleştiremez veya USER rolüne düşüremez
 
 ## Mail test
 

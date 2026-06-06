@@ -183,6 +183,11 @@ const UserStatus = {
   suspended: "suspended",
 } as const;
 
+const PlatformRole = {
+  USER: "USER",
+  ADMIN: "ADMIN",
+} as const;
+
 const ZeroTrustDecision = {
   allow: "allow",
   limited_allow: "limited_allow",
@@ -242,6 +247,7 @@ async function upsertUsers() {
       name: "Eyşan Yıldırım",
       email: "security.admin@hcsc.local",
       role: UserRole.security_admin,
+      platformRole: PlatformRole.ADMIN,
       department: "Security Operations",
       avatarInitials: "EY",
     },
@@ -250,6 +256,7 @@ async function upsertUsers() {
       name: "Emir Demirtaş",
       email: "analyst@hcsc.local",
       role: UserRole.cloud_security_analyst,
+      platformRole: PlatformRole.USER,
       department: "Cloud Security",
       avatarInitials: "ED",
     },
@@ -258,6 +265,7 @@ async function upsertUsers() {
       name: "Selin Doğan",
       email: "compliance@hcsc.local",
       role: UserRole.compliance_officer,
+      platformRole: PlatformRole.USER,
       department: "Compliance",
       avatarInitials: "SD",
     },
@@ -266,6 +274,7 @@ async function upsertUsers() {
       name: "Murat Yaman",
       email: "auditor@hcsc.local",
       role: UserRole.auditor,
+      platformRole: PlatformRole.USER,
       department: "Audit",
       avatarInitials: "MY",
     },
@@ -274,6 +283,7 @@ async function upsertUsers() {
       name: "Deniz Aksoy",
       email: "executive@hcsc.local",
       role: UserRole.executive,
+      platformRole: PlatformRole.USER,
       department: "Executive Office",
       avatarInitials: "DA",
     },
@@ -285,6 +295,7 @@ async function upsertUsers() {
       update: {
         name: user.name,
         role: user.role,
+        platformRole: user.platformRole,
         department: user.department,
         avatarInitials: user.avatarInitials,
         passwordHash: demoPasswordHash(),
@@ -298,6 +309,7 @@ async function upsertUsers() {
         email: user.email,
         passwordHash: demoPasswordHash(),
         role: user.role,
+        platformRole: user.platformRole,
         department: user.department,
         avatarInitials: user.avatarInitials,
         status: UserStatus.active,
@@ -417,6 +429,61 @@ async function upsertSettings() {
       confidentialityLabel: "Internal / Confidential",
     },
   });
+
+  const appSettings = [
+    {
+      key: "applicationName",
+      value: "HCSC.space",
+      description: "Public application name shown in the admin console.",
+    },
+    {
+      key: "maintenanceMode",
+      value: false,
+      description: "Controls whether the application should be treated as under maintenance.",
+    },
+    {
+      key: "registrationEnabled",
+      value: true,
+      description: "Controls whether new account registration is available.",
+    },
+    {
+      key: "adminContactEmail",
+      value: "security.admin@hcsc.local",
+      description: "Primary contact address for platform administration.",
+    },
+    {
+      key: "systemNoticeMessage",
+      value: "HCSC v2 foundation operational.",
+      description: "Short operational notice shown to administrators.",
+    },
+    {
+      key: "securityScanVisibility",
+      value: true,
+      description: "Controls whether security posture widgets are visible in the admin console.",
+    },
+    {
+      key: "publicStatusMessage",
+      value: "HCSC.space systems operational.",
+      description: "Short public-facing status message for operational surfaces.",
+    },
+  ] as const;
+
+  for (const setting of appSettings) {
+    await prisma.appSetting.upsert({
+      where: { key: setting.key },
+      update: {
+        value: setting.value,
+        description: setting.description,
+        updatedById: "user_security_admin",
+      },
+      create: {
+        key: setting.key,
+        value: setting.value,
+        description: setting.description,
+        updatedById: "user_security_admin",
+      },
+    });
+  }
 }
 
 async function upsertAssets() {

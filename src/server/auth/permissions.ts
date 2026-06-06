@@ -2,6 +2,7 @@ import type { Organization, User, UserRole as DbUserRole, UserStatus as DbUserSt
 
 import { rolePermissions } from "@/lib/permissions";
 import { prisma } from "@/server/db/prisma";
+import { isSystemOwner } from "@/server/auth/system-owner";
 import type { AppUser, OrganizationProfile, Permission, UserRole } from "@/types";
 
 const dbRoleToClientRoleMap: Record<DbUserRole, UserRole> = {
@@ -37,12 +38,14 @@ export function mapDbRoleToClientRole(role: DbUserRole): UserRole {
   return dbRoleToClientRoleMap[role];
 }
 
-export function mapDbUserToAppUser(user: Pick<User, "id" | "name" | "email" | "role" | "avatarInitials" | "department" | "mfaEnabled" | "status" | "lastLoginAt">): AppUser {
+export function mapDbUserToAppUser(user: Pick<User, "id" | "name" | "email" | "role" | "platformRole" | "avatarInitials" | "department" | "mfaEnabled" | "status" | "lastLoginAt">): AppUser {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     role: mapDbRoleToClientRole(user.role),
+    platformRole: user.platformRole,
+    isSystemOwner: isSystemOwner(user),
     avatarInitials: user.avatarInitials || buildAvatarInitials(user.name),
     department: user.department ?? "Security",
     mfaEnabled: user.mfaEnabled,

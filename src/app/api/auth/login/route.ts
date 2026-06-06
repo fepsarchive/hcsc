@@ -5,6 +5,7 @@ import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/perm
 import { verifyPassword } from "@/server/auth/password";
 import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { buildRequestMeta, createAuthAuditLog, createPendingSession, setSessionCookie } from "@/server/auth/session";
+import { isSystemOwner } from "@/server/auth/system-owner";
 import { isTwoFactorEnrolled } from "@/server/auth/two-factor";
 import { prisma } from "@/server/db/prisma";
 
@@ -148,9 +149,16 @@ export async function POST(request: NextRequest) {
     device: meta.userAgent,
   });
 
+  const postAuthPath = isSystemOwner(user)
+    ? "/admin"
+    : membership.organization.onboardingCompleted
+      ? "/dashboard"
+      : "/onboarding";
+
   const response = NextResponse.json({
     data: {
       requires2FA: true,
+      requiresTwoFactor: true,
       authenticated: true,
       twoFactorVerified: false,
       sessionStartedAt: session.createdAt.toISOString(),
@@ -162,6 +170,8 @@ export async function POST(request: NextRequest) {
         enabledAt: user.twoFactorSecret?.enabledAt,
         enrolledAt: user.twoFactorSecret?.enrolledAt,
       }),
+      nextPath: postAuthPath,
+      redirectTo: "/verify-2fa",
     },
     meta: { requestId: meta.requestId },
     error: null,

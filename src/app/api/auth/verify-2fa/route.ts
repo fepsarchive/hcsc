@@ -5,6 +5,7 @@ import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/perm
 import { consumeRecoveryCode } from "@/server/auth/recovery-codes";
 import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { buildRequestMeta, createAuthAuditLog, getSessionContext, getSessionTokenFromRequest } from "@/server/auth/session";
+import { isSystemOwner } from "@/server/auth/system-owner";
 import { isReplayProtectedStep, isTwoFactorEnrolled, persistSuccessfulTwoFactorVerification, verifyTwoFactorCode } from "@/server/auth/two-factor";
 
 const verifySchema = z.object({
@@ -180,17 +181,41 @@ export async function POST(request: NextRequest) {
       device: meta.userAgent,
     });
 
+    const redirectTo = isSystemOwner(updatedSession.user)
+      ? "/admin"
+      : updatedSession.organization.onboardingCompleted
+        ? "/dashboard"
+        : "/onboarding";
+
+    if (isSystemOwner(updatedSession.user)) {
+      await createAuthAuditLog({
+        organizationId: updatedSession.organizationId,
+        userId: updatedSession.userId,
+        actorName: updatedSession.user.name,
+        actorRole: mapDbUserToAppUser(updatedSession.user).role,
+        action: "system_owner_login_success",
+        target: updatedSession.user.email,
+        severity: "info",
+        result: "success",
+        details: "System owner recovery code ile admin erişimi için doğrulandı.",
+        ipAddress: meta.ipAddress,
+        device: meta.userAgent,
+      });
+    }
+
     return applyRateLimitHeaders(
       NextResponse.json({
         data: {
           authenticated: true,
+          requiresTwoFactor: false,
           twoFactorVerified: true,
           sessionStartedAt: updatedSession.createdAt.toISOString(),
           user: mapDbUserToAppUser(updatedSession.user),
           organization: mapOrganizationToProfile(updatedSession.organization),
           onboardingCompleted: updatedSession.organization.onboardingCompleted,
           twoFactorEnrolled: true,
-          nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
+          nextPath: redirectTo,
+          redirectTo,
         },
         meta: { requestId: meta.requestId },
         error: null,
@@ -309,17 +334,41 @@ export async function POST(request: NextRequest) {
     device: meta.userAgent,
   });
 
+  const redirectTo = isSystemOwner(updatedSession.user)
+    ? "/admin"
+    : updatedSession.organization.onboardingCompleted
+      ? "/dashboard"
+      : "/onboarding";
+
+  if (isSystemOwner(updatedSession.user)) {
+    await createAuthAuditLog({
+      organizationId: updatedSession.organizationId,
+      userId: updatedSession.userId,
+      actorName: updatedSession.user.name,
+      actorRole: mapDbUserToAppUser(updatedSession.user).role,
+      action: "system_owner_login_success",
+      target: updatedSession.user.email,
+      severity: "info",
+      result: "success",
+      details: "System owner TOTP ile admin erişimi için doğrulandı.",
+      ipAddress: meta.ipAddress,
+      device: meta.userAgent,
+    });
+  }
+
   return applyRateLimitHeaders(
     NextResponse.json({
       data: {
         authenticated: true,
+        requiresTwoFactor: false,
         twoFactorVerified: true,
         sessionStartedAt: updatedSession.createdAt.toISOString(),
         user: mapDbUserToAppUser(updatedSession.user),
         organization: mapOrganizationToProfile(updatedSession.organization),
         onboardingCompleted: updatedSession.organization.onboardingCompleted,
         twoFactorEnrolled: true,
-        nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
+        nextPath: redirectTo,
+        redirectTo,
       },
       meta: { requestId: meta.requestId },
       error: null,

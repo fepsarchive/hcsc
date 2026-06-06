@@ -62,10 +62,12 @@ Aşağıdaki değişkenler production’da tanımlanmalıdır:
 - `MAIL_FROM`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
+- `SYSTEM_OWNER_EMAIL` veya `SYSTEM_OWNER_USER_ID`
 
 Notlar:
 
 - `APP_URL` production’da `https://hcsc.space` olacak şekilde tanımlanmalıdır.
+- Admin console erişimi tekil system owner modelindedir; production’da `SYSTEM_OWNER_EMAIL` veya `SYSTEM_OWNER_USER_ID` tanımlanmalıdır.
 - `RECOVERY_CODE_HASH_KEY` ayrı tanımlanmalı; `SESSION_SECRET` fallback olarak bırakılmamalıdır.
 - `UPSTASH_*` env yoksa local development için in-memory rate limit fallback çalışır. Production’da merkezi Redis tavsiye edilir.
 

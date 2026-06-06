@@ -16,7 +16,7 @@ const anonymousAccessibleRoutes = new Set(["/login", "/register", "/forgot-passw
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { auth, onboardingCompleted, isHydrating, apiError, isApiMode, lastSyncedAt } = useDemo()
+  const { auth, currentUser, onboardingCompleted, isHydrating, apiError, isApiMode, lastSyncedAt } = useDemo()
   const contentScrollRef = useRef<HTMLDivElement | null>(null)
   const isPublicRoute = publicRoutes.has(pathname)
   const isAlwaysAccessiblePublicRoute =
@@ -30,11 +30,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname === "/login" ||
     pathname === "/verify-2fa"
   const isPrintRoute = pathname.startsWith("/reports/") && pathname.endsWith("/print")
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
 
   const redirectTarget = useMemo(() => {
     if (!auth.hydrated) return null
 
+    if (isAdminRoute) return null
+
     if (!auth.isAuthenticated) {
+      if (auth.requiresTwoFactor) {
+        return pathname === "/verify-2fa" ? null : "/verify-2fa"
+      }
+
       return anonymousAccessibleRoutes.has(pathname) ? null : "/login"
     }
 
@@ -55,11 +62,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     if (isPublicRoute && !isAlwaysAccessiblePublicRoute) {
-      return "/dashboard"
+      return currentUser?.isSystemOwner ? "/admin" : "/dashboard"
     }
 
     return null
-  }, [auth.hydrated, auth.isAuthenticated, auth.is2FAVerified, isAlwaysAccessiblePublicRoute, isPublicRoute, onboardingCompleted, pathname])
+  }, [
+    auth.hydrated,
+    auth.isAuthenticated,
+    auth.is2FAVerified,
+    auth.requiresTwoFactor,
+    currentUser?.isSystemOwner,
+    isAdminRoute,
+    isAlwaysAccessiblePublicRoute,
+    isPublicRoute,
+    onboardingCompleted,
+    pathname,
+  ])
 
   useEffect(() => {
     if (!redirectTarget || pathname === redirectTarget) return
@@ -86,9 +104,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [auth.hydrated, auth.isAuthenticated, auth.is2FAVerified, onboardingCompleted, pathname, router])
 
   useEffect(() => {
-    if (isPublicRoute) return
+    if (isPublicRoute || isAdminRoute) return
     contentScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" })
-  }, [isPublicRoute, pathname])
+  }, [isAdminRoute, isPublicRoute, pathname])
+
+  if (isAdminRoute) {
+    return (
+      <div className="h-svh overflow-hidden bg-background">
+        <ToastStack />
+        {children}
+      </div>
+    )
+  }
 
   if (!auth.hydrated || redirectTarget) {
     return (

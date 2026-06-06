@@ -66,6 +66,7 @@ export type SettingsBundle = {
 
 export type AuthUserPayload = {
   authenticated: boolean;
+  requiresTwoFactor?: boolean;
   twoFactorVerified: boolean;
   sessionStartedAt: string | null;
   user: AppUser | null;
@@ -74,6 +75,7 @@ export type AuthUserPayload = {
   twoFactorEnrolled?: boolean;
   recoveryCodes?: string[];
   nextPath?: string;
+  redirectTo?: string;
 };
 
 export type VerifyTwoFactorMethod = "totp" | "recovery";

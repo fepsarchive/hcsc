@@ -313,6 +313,12 @@ export function SiteHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {currentUser?.isSystemOwner ? (
+                <DropdownMenuItem onClick={() => router.push("/admin")}>
+                  <ShieldCheckIcon />
+                  Admin Console
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onClick={() => router.push("/settings")}>
                 <UserCircle2Icon />
                 Profil ve ayarlar

@@ -98,6 +98,7 @@ export type TeamRoleKey =
 
 export type UserStatus = "active" | "invited" | "suspended";
 export type TeamInviteStatus = "pending" | "accepted" | "revoked" | "expired";
+export type PlatformRole = "USER" | "ADMIN";
 export type Permission =
   | "view_dashboard"
   | "view_assets"
@@ -119,6 +120,8 @@ export interface AppUser {
   name: string;
   email: string;
   role: UserRole;
+  platformRole: PlatformRole;
+  isSystemOwner: boolean;
   avatarInitials: string;
   department: string;
   mfaEnabled: boolean;
@@ -139,6 +142,7 @@ export interface OrganizationProfile {
 export interface AuthState {
   hydrated: boolean;
   isAuthenticated: boolean;
+  requiresTwoFactor: boolean;
   is2FAVerified: boolean;
   currentUserId: string | null;
   sessionStartedAt: string | null;
@@ -165,6 +169,7 @@ export type AuditAction =
   | "login_failed"
   | "password_reset_requested"
   | "password_reset_completed"
+  | "system_owner_login_success"
   | "two_factor_verified"
   | "two_factor_failed"
   | "recovery_code_used"
@@ -188,7 +193,12 @@ export type AuditAction =
   | "team_invite_revoked"
   | "team_invite_accepted"
   | "team_member_role_updated"
-  | "team_member_removed";
+  | "team_member_removed"
+  | "system_owner_page_forbidden"
+  | "system_owner_api_forbidden"
+  | "admin_user_role_updated"
+  | "admin_user_status_updated"
+  | "admin_settings_updated";
 
 export interface AuditLogItem {
   id: string;
