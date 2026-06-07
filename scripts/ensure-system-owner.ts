@@ -117,7 +117,7 @@ async function findOwner(prisma: PrismaClient) {
   if (target.ownerUserId) {
     const byId = await prisma.user.findUnique({
       where: { id: target.ownerUserId },
-      include: { memberships: true },
+      include: { memberships: true, twoFactorSecret: true },
     });
 
     if (byId) {
@@ -127,8 +127,30 @@ async function findOwner(prisma: PrismaClient) {
 
   return prisma.user.findUnique({
     where: { email: target.ownerEmail },
-    include: { memberships: true },
+    include: { memberships: true, twoFactorSecret: true },
   });
+}
+
+function hasProductionCompatibleTwoFactorSecret(secret: string | null | undefined) {
+  if (!secret) {
+    return false;
+  }
+
+  if (secret.startsWith("totp:v1:")) {
+    return true;
+  }
+
+  return /^[A-Z2-7]{16,}$/.test(secret.replace(/\s+/g, "").toUpperCase());
+}
+
+function isOwnerTwoFactorProductionReady(owner: NonNullable<Awaited<ReturnType<typeof findOwner>>>) {
+  const secret = owner.twoFactorSecret;
+
+  return Boolean(
+    secret &&
+      (secret.enabledAt || secret.enrolledAt) &&
+      hasProductionCompatibleTwoFactorSecret(secret.secret),
+  );
 }
 
 async function getFindings(prisma: PrismaClient): Promise<Finding[]> {
@@ -193,6 +215,13 @@ async function getFindings(prisma: PrismaClient): Promise<Finding[]> {
       status: owner.memberships.length >= 1 ? "ok" : "needs_fix",
       detail: `count=${owner.memberships.length}`,
     },
+    {
+      key: "OWNER_2FA",
+      status: isOwnerTwoFactorProductionReady(owner) ? "ok" : "needs_fix",
+      detail: isOwnerTwoFactorProductionReady(owner)
+        ? "production-compatible TOTP enrollment present"
+        : "missing or legacy demo 2FA enrollment; production will not accept demo code",
+    },
   );
 
   return findings;
@@ -228,6 +257,39 @@ async function ensureOrganization(prisma: PrismaClient) {
       complianceFrameworks: ["ISO 27001", "NIST CSF 2.0"],
       demoMode: false,
       onboardingCompleted: true,
+    },
+  });
+}
+
+async function writeOwnerScriptAuditLog(
+  prisma: PrismaClient,
+  input: {
+    organizationId: string | null;
+    userId: string;
+    ownerEmail: string;
+    action: "system_owner_ensured" | "system_owner_password_reset";
+    details: string;
+  },
+) {
+  if (!input.organizationId) {
+    return;
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      actorName: "owner recovery script",
+      actorRole: "System",
+      action: input.action,
+      module: "Admin",
+      target: input.ownerEmail,
+      result: "success",
+      severity: "warning",
+      details: input.details,
+      metadata: {
+        source: "scripts/ensure-system-owner.ts",
+      },
     },
   });
 }
@@ -283,6 +345,39 @@ async function fixOwner(prisma: PrismaClient, resetPassword: boolean) {
       role: UserRole.security_admin,
     },
   });
+
+  await writeOwnerScriptAuditLog(prisma, {
+    organizationId: organization.id,
+    userId: owner.id,
+    ownerEmail: owner.email,
+    action: resetPassword ? "system_owner_password_reset" : "system_owner_ensured",
+    details: resetPassword
+      ? "System owner password was reset by the owner recovery script."
+      : "System owner account, role, status, and membership were ensured by the owner recovery script.",
+  });
+}
+
+async function resetOwnerPasswordOnly(prisma: PrismaClient) {
+  const owner = await findOwner(prisma);
+
+  if (!owner) {
+    throw new Error("System owner account not found. Run owner:fix only after reviewing production DB impact.");
+  }
+
+  await prisma.user.update({
+    where: { id: owner.id },
+    data: {
+      passwordHash: hashPassword(getOwnerPassword()),
+    },
+  });
+
+  await writeOwnerScriptAuditLog(prisma, {
+    organizationId: owner.memberships[0]?.organizationId ?? null,
+    userId: owner.id,
+    ownerEmail: owner.email,
+    action: "system_owner_password_reset",
+    details: "System owner password was reset by the owner recovery script.",
+  });
 }
 
 async function main() {
@@ -295,7 +390,12 @@ async function main() {
       return;
     }
 
-    await fixOwner(prisma, mode === "reset-password");
+    if (mode === "reset-password") {
+      await resetOwnerPasswordOnly(prisma);
+    } else {
+      await fixOwner(prisma, false);
+    }
+
     formatFindings(await getFindings(prisma));
   } finally {
     await prisma.$disconnect();
