@@ -112,7 +112,7 @@ export function AdminShell({
                   className="rounded-xl"
                 >
                   <Link href="/admin">
-                    <div className="flex aspect-square size-8 items-center justify-center rounded-xl border border-sidebar-border/70 bg-sidebar-accent/40 text-primary">
+                    <div className="flex aspect-square size-8 items-center justify-center rounded-xl text-primary">
                       <ShieldCheckIcon className="size-4" />
                     </div>
                     <div className="grid flex-1 text-left text-sm leading-tight">
