@@ -6,78 +6,40 @@ import { usePathname, useRouter } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { ToastStack } from "@/components/layout/toast-stack"
-import { useDemo } from "@/components/layout/demo-provider"
+import {
+  isAdminPath,
+  isScrollablePublicPath,
+  publicRoutes,
+  resolveAppShellRedirect,
+} from "@/lib/auth-redirects"
+import { useSecurityConsoleStore } from "@/store/security-console-store"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
-
-const publicRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password", "/verify-2fa", "/onboarding", "/accept-invite"])
-const anonymousAccessibleRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password", "/accept-invite"])
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { auth, currentUser, onboardingCompleted, isHydrating, apiError, isApiMode, lastSyncedAt } = useDemo()
+  const auth = useSecurityConsoleStore((state) => state.auth)
+  const currentUser = useSecurityConsoleStore((state) => state.currentUser)
+  const onboardingCompleted = useSecurityConsoleStore((state) => state.onboardingCompleted)
+  const isHydrating = useSecurityConsoleStore((state) => state.isHydrating)
+  const apiError = useSecurityConsoleStore((state) => state.apiError)
+  const isApiMode = useSecurityConsoleStore((state) => state.isApiMode)
+  const lastSyncedAt = useSecurityConsoleStore((state) => state.lastSyncedAt)
   const contentScrollRef = useRef<HTMLDivElement | null>(null)
   const isPublicRoute = publicRoutes.has(pathname)
-  const isAlwaysAccessiblePublicRoute =
-    pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password" || pathname === "/accept-invite"
-  const isScrollablePublicRoute =
-    pathname === "/onboarding" ||
-    pathname === "/register" ||
-    pathname === "/forgot-password" ||
-    pathname === "/reset-password" ||
-    pathname === "/accept-invite" ||
-    pathname === "/login" ||
-    pathname === "/verify-2fa"
+  const isScrollablePublicRoute = isScrollablePublicPath(pathname)
   const isPrintRoute = pathname.startsWith("/reports/") && pathname.endsWith("/print")
-  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
+  const isAdminRoute = isAdminPath(pathname)
 
   const redirectTarget = useMemo(() => {
-    if (!auth.hydrated) return null
-
-    if (isAdminRoute) return null
-
-    if (!auth.isAuthenticated) {
-      if (auth.requiresTwoFactor) {
-        return pathname === "/verify-2fa" ? null : "/verify-2fa"
-      }
-
-      return anonymousAccessibleRoutes.has(pathname) ? null : "/login"
-    }
-
-    if (pathname === "/accept-invite") {
-      if (!auth.is2FAVerified) {
-        return "/verify-2fa"
-      }
-
-      return null
-    }
-
-    if (!auth.is2FAVerified) {
-      return pathname === "/verify-2fa" ? null : "/verify-2fa"
-    }
-
-    if (!onboardingCompleted) {
-      return pathname === "/onboarding" ? null : "/onboarding"
-    }
-
-    if (isPublicRoute && !isAlwaysAccessiblePublicRoute) {
-      return currentUser?.isSystemOwner ? "/admin" : "/dashboard"
-    }
-
-    return null
-  }, [
-    auth.hydrated,
-    auth.isAuthenticated,
-    auth.is2FAVerified,
-    auth.requiresTwoFactor,
-    currentUser?.isSystemOwner,
-    isAdminRoute,
-    isAlwaysAccessiblePublicRoute,
-    isPublicRoute,
-    onboardingCompleted,
-    pathname,
-  ])
+    return resolveAppShellRedirect({
+      pathname,
+      auth,
+      currentUser,
+      onboardingCompleted,
+    })
+  }, [auth, currentUser, onboardingCompleted, pathname])
 
   useEffect(() => {
     if (!redirectTarget || pathname === redirectTarget) return

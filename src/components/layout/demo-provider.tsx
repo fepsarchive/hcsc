@@ -9,7 +9,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const hasRequestedHydrationRef = useRef(false);
 
   useEffect(() => {
-    if (hasRequestedHydrationRef.current) {
+    if (hasRequestedHydrationRef.current || typeof window === "undefined") {
       return;
     }
 

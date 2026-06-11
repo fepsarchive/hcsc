@@ -1,59 +1,34 @@
-# HCSC v2 Production Checkpoint
+# HCSC v1.1 Stable Release
 
-## Tamamlanan ana paketler
+## Fixed
+- Fixed the 2FA "Farkli hesapla giris yap" loop by clearing the pending session before routing back to `/login`.
+- Stabilized React external-store subscriptions to avoid `getServerSnapshot` and maximum update depth loops.
+- Added explicit redirect tests for unauthenticated, pending 2FA, verified user, and System Owner states.
 
-- Prisma + PostgreSQL foundation
-- auth / session / 2FA persistence
-- core API + persistence
-- backend engines
-- frontend API adapter
-- trap endpoint + print flow
-- auth hardening
-- gerçek TOTP 2FA enrollment
-- recovery codes
-- Resend password reset
-- distributed rate limit
-- team management foundation
-- security headers + error UI
+## Improved
+- Moved app-shell redirect decisions into a small testable helper.
+- Reduced broad store subscriptions in high-traffic layout and dashboard components.
+- Added a minimum in-memory rate limit guard for public deception trap probes.
 
-## Auth hardening tamamlandı
+## Security
+- Logout cleanup now covers pending 2FA sessions before account switching.
+- Trap endpoints continue to return only a safe 404 response and never expose real resources or secrets.
+- Trap probes create defensive telemetry while rate limiting repeated writes from the same source.
 
-- DB-backed register
-- transaction-safe user / organization / membership oluşturma
-- session cookie güvenliği
-- TOTP 2FA enrollment
-- recovery code kurtarma akışı
-- Resend password reset maili
-- auth endpoint rate limiting
+## QA
+- Added `npm run test` using Node's test runner through `tsx`.
+- Added `npm run typecheck`.
+- Verified lint, typecheck, test, Prisma validate/generate, production build, and local browser smoke.
 
-## Required env vars
+## Known Limitations
+- `prisma migrate status` currently returns a Prisma schema engine error against the configured Neon datasource.
+- `npm audit` reports transitive dependency vulnerabilities; no automatic dependency upgrade was applied in this stabilization pass.
+- Seed was not run automatically because it writes to the configured database.
 
-- `DATABASE_URL`
-- `DIRECT_URL`
-- `APP_URL`
-- `SESSION_SECRET`
-- `JWT_SECRET`
-- `TWO_FACTOR_ENCRYPTION_KEY`
-- `RECOVERY_CODE_HASH_KEY`
-- `RESEND_API_KEY`
-- `MAIL_FROM`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-
-## Manual smoke test checklist
-
-- register → 2FA setup → recovery codes → onboarding → dashboard
-- logout → login → TOTP verify → dashboard
-- logout → login → recovery code verify → dashboard
-- forgot password → reset password → new password login
-- settings → recovery codes regenerate
-- settings → team invite / role update / revoke
-- auth rate limit 429
-- mobile auth and settings layouts
-
-## Bilinen sınırlar
-
-- gerçek Upstash production env ile canlı smoke test bu local oturumda yapılamadı
-- invite acceptance akışı ilk MVP sürümünde tek aktif organization session modeline göre çalışır
-- recovery codes için opsiyonel expiry politikası henüz yok
-- tam mobil görsel QA için gerçek cihaz tarayıcı turu önerilir
+## Verification
+- lint: pass
+- typecheck: pass
+- test: pass
+- build: pass
+- prisma: validate/generate pass; migrate status blocked by schema engine error
+- smoke: local `/login` -> `/verify-2fa` -> switch account -> `/login` pass

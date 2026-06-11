@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRightIcon, CopyIcon, KeyRoundIcon, QrCodeIcon, ShieldCheckIcon } from "lucide-react";
 import QRCode from "qrcode";
 
-import { AuthLinks, AuthMessage, AuthShell } from "@/components/auth/auth-shell";
+import { AuthMessage, AuthShell } from "@/components/auth/auth-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,6 +24,7 @@ export default function VerifyTwoFactorPage() {
   const router = useRouter();
   const verify2FA = useSecurityConsoleStore((state) => state.verify2FA);
   const hydrateAuthSession = useSecurityConsoleStore((state) => state.hydrateAuthSession);
+  const logout = useSecurityConsoleStore((state) => state.logout);
   const currentUser = useSecurityConsoleStore((state) => state.currentUser);
 
   const [mode, setMode] = useState<"loading" | "setup" | "verify">("loading");
@@ -38,6 +39,7 @@ export default function VerifyTwoFactorPage() {
   const [generatedRecoveryCodes, setGeneratedRecoveryCodes] = useState<string[] | null>(null);
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
   const [recoveryCodesAcknowledged, setRecoveryCodesAcknowledged] = useState(false);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
 
   const maskedEmail = useMemo(
     () => currentUser?.email ?? "hesabın",
@@ -195,6 +197,21 @@ export default function VerifyTwoFactorPage() {
     }
   };
 
+  const handleSwitchAccount = async () => {
+    if (isSwitchingAccount) {
+      return;
+    }
+
+    setIsSwitchingAccount(true);
+    setError(null);
+
+    try {
+      await logout();
+    } finally {
+      router.replace("/login");
+    }
+  };
+
   return (
     <AuthShell
       eyebrow={mode === "setup" ? "Two Factor Setup" : "Two Factor Verification"}
@@ -214,7 +231,15 @@ export default function VerifyTwoFactorPage() {
               <Badge variant="outline">{setupData.issuer}</Badge>
             ) : null}
           </div>
-          <AuthLinks primaryHref="/login" primaryLabel="Farklı hesapla giriş yap" />
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto p-0 text-sm font-medium text-[var(--text-primary)] hover:text-cyan-300"
+            disabled={isSwitchingAccount}
+            onClick={() => void handleSwitchAccount()}
+          >
+            {isSwitchingAccount ? "Oturum temizleniyor..." : "Farklı hesapla giriş yap"}
+          </Button>
         </div>
       }
     >

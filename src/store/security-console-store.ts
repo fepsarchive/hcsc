@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
 
 import { mockAuthAccounts, mockOrganization } from "@/lib/auth-mock-data";
 import { calculateComplianceSnapshot } from "@/lib/compliance-engine";
@@ -262,6 +262,7 @@ const AUTH_SESSION_KEY = "hcsc-auth-session";
 const ALLOW_LOCAL_AUTH_FALLBACK = process.env.NODE_ENV !== "production";
 
 const listeners = new Set<() => void>();
+let authHydrationPromise: Promise<void> | null = null;
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
@@ -270,6 +271,40 @@ function subscribe(listener: () => void) {
 
 function emitChange() {
   listeners.forEach((listener) => listener());
+}
+
+function getStoreSnapshot() {
+  return store;
+}
+
+function getServerStoreSnapshot() {
+  return store;
+}
+
+function shallowEqual<T>(left: T, right: T) {
+  if (Object.is(left, right)) {
+    return true;
+  }
+
+  if (
+    typeof left !== "object" ||
+    left === null ||
+    typeof right !== "object" ||
+    right === null
+  ) {
+    return false;
+  }
+
+  const leftRecord = left as Record<PropertyKey, unknown>;
+  const rightRecord = right as Record<PropertyKey, unknown>;
+  const leftKeys = Reflect.ownKeys(leftRecord);
+  const rightKeys = Reflect.ownKeys(rightRecord);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => Object.is(leftRecord[key], rightRecord[key]));
 }
 
 function createInitialMeta(): StoreMeta {
@@ -1967,17 +2002,55 @@ const actions: Pick<
 
   async hydrateAuthSession() {
     if (currentMeta.auth.hydrated) return;
+    if (authHydrationPromise) return authHydrationPromise;
 
-    const persisted = readPersistedAuthMeta();
-    const persistedEmail = persisted?.currentUser?.email;
+    authHydrationPromise = (async () => {
+      const persisted = readPersistedAuthMeta();
+      const persistedEmail = persisted?.currentUser?.email;
 
-    if (
-      ALLOW_LOCAL_AUTH_FALLBACK &&
-      persisted?.auth.isAuthenticated &&
-      persisted.auth.is2FAVerified &&
-      persistedEmail &&
-      isCustomDemoAuthAccount(persistedEmail)
-    ) {
+      if (
+        ALLOW_LOCAL_AUTH_FALLBACK &&
+        persisted?.auth.isAuthenticated &&
+        persisted.auth.is2FAVerified &&
+        persistedEmail &&
+        isCustomDemoAuthAccount(persistedEmail)
+      ) {
+        setMeta({
+          auth: {
+            ...persisted.auth,
+            hydrated: true,
+          },
+          currentUser: persisted.currentUser ?? null,
+          onboardingCompleted: persisted.onboardingCompleted,
+          organization: persisted.organization ?? currentMeta.organization,
+          auditLogs: persisted.auditLogs ?? currentMeta.auditLogs,
+          notifications: persisted.notifications ?? currentMeta.notifications,
+        });
+        return;
+      }
+
+      try {
+        const result = await getCurrentUser();
+        applyServerAuthPayload(result);
+
+        if (result.authenticated && result.twoFactorVerified) {
+          await hydrateEnvironmentFromApi({ silent: true });
+          return;
+        }
+      } catch {
+        // Network or server failure falls back to persisted mock/session state.
+      }
+
+      if (!persisted) {
+        setMeta({
+          auth: {
+            ...currentMeta.auth,
+            hydrated: true,
+          },
+        });
+        return;
+      }
+
       setMeta({
         auth: {
           ...persisted.auth,
@@ -1986,43 +2059,12 @@ const actions: Pick<
         currentUser: persisted.currentUser ?? null,
         onboardingCompleted: persisted.onboardingCompleted,
         organization: persisted.organization ?? currentMeta.organization,
-        auditLogs: persisted.auditLogs ?? currentMeta.auditLogs,
-        notifications: persisted.notifications ?? currentMeta.notifications,
       });
-      return;
-    }
-
-    try {
-      const result = await getCurrentUser();
-      applyServerAuthPayload(result);
-
-      if (result.authenticated && result.twoFactorVerified) {
-        await hydrateEnvironmentFromApi({ silent: true });
-        return;
-      }
-    } catch {
-      // Network or server failure falls back to persisted mock/session state.
-    }
-
-    if (!persisted) {
-      setMeta({
-        auth: {
-          ...currentMeta.auth,
-          hydrated: true,
-        },
-      });
-      return;
-    }
-
-    setMeta({
-      auth: {
-        ...persisted.auth,
-        hydrated: true,
-      },
-      currentUser: persisted.currentUser ?? null,
-      onboardingCompleted: persisted.onboardingCompleted,
-      organization: persisted.organization ?? currentMeta.organization,
+    })().finally(() => {
+      authHydrationPromise = null;
     });
+
+    return authHydrationPromise;
   },
 
   async login(email, password) {
@@ -2827,13 +2869,13 @@ const identitySelector = <T,>(state: T) => state;
 function useSecurityConsoleStoreBase<T = SecurityConsoleStore>(
   selector: (state: SecurityConsoleStore) => T = identitySelector as (state: SecurityConsoleStore) => T,
 ) {
-  const snapshot = useSyncExternalStore(
+  return useSyncExternalStoreWithSelector(
     subscribe,
-    () => store,
-    () => store,
+    getStoreSnapshot,
+    getServerStoreSnapshot,
+    selector,
+    shallowEqual,
   );
-
-  return selector(snapshot);
 }
 
 type SecurityConsoleStoreHook = {

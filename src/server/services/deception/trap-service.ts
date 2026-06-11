@@ -4,12 +4,33 @@ import { prisma } from "@/server/db/prisma";
 import { createAuditLog } from "@/server/services/audit/audit-log-service";
 import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
 
+const TRAP_RATE_LIMIT_WINDOW_MS = 60_000;
+const TRAP_RATE_LIMIT_MAX_REQUESTS = 30;
+const trapRateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+
 function slugify(value: string) {
   return value
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function isTrapRateLimited(input: { trapSlug: string; sourceIp: string | null }) {
+  const now = Date.now();
+  const key = `${input.trapSlug}:${input.sourceIp ?? "unknown"}`;
+  const current = trapRateLimitBuckets.get(key);
+
+  if (!current || current.resetAt <= now) {
+    trapRateLimitBuckets.set(key, {
+      count: 1,
+      resetAt: now + TRAP_RATE_LIMIT_WINDOW_MS,
+    });
+    return false;
+  }
+
+  current.count += 1;
+  return current.count > TRAP_RATE_LIMIT_MAX_REQUESTS;
 }
 
 function extractIpAddress(request: NextRequest) {
@@ -58,6 +79,11 @@ export async function triggerTrapForRequest(trapSlug: string, request: NextReque
   const requestPath = request.nextUrl.pathname;
   const userAgent = request.headers.get("user-agent");
   const sourceIp = extractIpAddress(request);
+
+  if (isTrapRateLimited({ trapSlug, sourceIp })) {
+    return null;
+  }
+
   const safeHeaders = buildSafeHeaderSubset(request);
 
   const updatedDeceptionAsset = await prisma.deceptionAsset.update({

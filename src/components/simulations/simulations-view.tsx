@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useDemo } from "@/components/layout/demo-provider";
 import { ActionButton } from "@/components/ui/action-button";
 import { Badge } from "@/components/ui/badge";
 import { PageIntro } from "@/components/ui/page-intro";
 import { Panel } from "@/components/ui/panel";
 import { formatDateTime } from "@/lib/utils";
+import { useSecurityConsoleStore } from "@/store/security-console-store";
 
 export function SimulationsView() {
-  const { environment, runSimulation, lastSimulationResult, startDemoScenario, runExecutiveDemo, resetDemoData } = useDemo();
+  const environment = useSecurityConsoleStore((state) => state.environment);
+  const runSimulation = useSecurityConsoleStore((state) => state.runSimulation);
+  const lastSimulationResult = useSecurityConsoleStore((state) => state.lastSimulationResult);
+  const startDemoScenario = useSecurityConsoleStore((state) => state.startDemoScenario);
+  const runExecutiveDemo = useSecurityConsoleStore((state) => state.runExecutiveDemo);
+  const resetDemoData = useSecurityConsoleStore((state) => state.resetDemoData);
   const currentDemoStep = environment.demoScenario.steps[environment.demoScenario.currentStep];
 
   return (

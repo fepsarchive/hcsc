@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { useDemo } from "@/components/layout/demo-provider";
 import {
   DataTable,
   DataTableBody,
@@ -29,18 +28,17 @@ import {
   locationLabel,
   requestStatusTone,
 } from "@/lib/utils";
+import { useSecurityConsoleStore } from "@/store/security-console-store";
 
 export function DashboardView() {
-  const {
-    dashboard,
-    environment,
-    nextDemoStep,
-    previousDemoStep,
-    startDemoScenario,
-    runExecutiveDemo,
-    lastSimulationResult,
-    isHydrating,
-  } = useDemo();
+  const dashboard = useSecurityConsoleStore((state) => state.dashboard);
+  const environment = useSecurityConsoleStore((state) => state.environment);
+  const nextDemoStep = useSecurityConsoleStore((state) => state.nextDemoStep);
+  const previousDemoStep = useSecurityConsoleStore((state) => state.previousDemoStep);
+  const startDemoScenario = useSecurityConsoleStore((state) => state.startDemoScenario);
+  const runExecutiveDemo = useSecurityConsoleStore((state) => state.runExecutiveDemo);
+  const lastSimulationResult = useSecurityConsoleStore((state) => state.lastSimulationResult);
+  const isHydrating = useSecurityConsoleStore((state) => state.isHydrating);
 
   const currentDemoStep = environment.demoScenario.steps[environment.demoScenario.currentStep];
   const pendingRequests = environment.accessRequests.filter((request) => request.status === "pending").length;

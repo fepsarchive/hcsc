@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useDemo } from "@/components/layout/demo-provider";
 import { AvatarToken } from "@/components/ui/avatar-token";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +47,7 @@ import {
   updateTeamMemberRole,
 } from "@/lib/hcsc-api";
 import { rolePermissions } from "@/lib/permissions";
+import { useSecurityConsoleStore } from "@/store/security-console-store";
 import type { TeamInviteRecord, TeamMemberRecord, TeamRoleKey } from "@/types";
 
 const SETTINGS_PREFERENCES_KEY = "hcsc-settings-preferences";
@@ -118,20 +118,16 @@ function getStoredWorkspacePreferences(displayName?: string): WorkspacePreferenc
 }
 
 export function SettingsView() {
-  const {
-    currentUser,
-    currentOrganization,
-    auth,
-    can,
-    settingsBundle,
-    operationLoading,
-    updateRiskPolicy,
-    updateReportBranding,
-    updateOrganizationSettings,
-  } = useDemo();
+  const currentUser = useSecurityConsoleStore((state) => state.currentUser);
+  const currentOrganization = useSecurityConsoleStore((state) => state.currentOrganization);
+  const auth = useSecurityConsoleStore((state) => state.auth);
+  const canManageSettings = useSecurityConsoleStore((state) => state.can("manage_settings"));
+  const settingsBundle = useSecurityConsoleStore((state) => state.settingsBundle);
+  const isSaving = useSecurityConsoleStore((state) => Boolean(state.operationLoading.settings));
+  const updateRiskPolicy = useSecurityConsoleStore((state) => state.updateRiskPolicy);
+  const updateReportBranding = useSecurityConsoleStore((state) => state.updateReportBranding);
+  const updateOrganizationSettings = useSecurityConsoleStore((state) => state.updateOrganizationSettings);
 
-  const canManageSettings = can("manage_settings");
-  const isSaving = Boolean(operationLoading.settings);
   const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(() =>
     getStoredWorkspacePreferences(currentUser?.name),
   );

@@ -18,7 +18,6 @@ import {
 } from "lucide-react"
 
 import { Breadcrumbs } from "@/components/layout/breadcrumbs"
-import { useDemo } from "@/components/layout/demo-provider"
 import { useTheme } from "@/components/layout/theme-provider"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +34,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
+import { useSecurityConsoleStore } from "@/store/security-console-store"
 
 const pageMeta: Record<string, { title: string; description: string }> = {
   "/": {
@@ -113,20 +113,18 @@ const quickTargets = [
 export function SiteHeader() {
   const router = useRouter()
   const pathname = usePathname()
-  const {
-    environment,
-    dashboard,
-    runExecutiveDemo,
-    generateReport,
-    currentUser,
-    currentOrganization,
-    logout,
-    can,
-    notifications,
-    markNotificationRead,
-    markAllNotificationsRead,
-  } =
-    useDemo()
+  const environment = useSecurityConsoleStore((state) => state.environment)
+  const dashboard = useSecurityConsoleStore((state) => state.dashboard)
+  const runExecutiveDemo = useSecurityConsoleStore((state) => state.runExecutiveDemo)
+  const generateReport = useSecurityConsoleStore((state) => state.generateReport)
+  const currentUser = useSecurityConsoleStore((state) => state.currentUser)
+  const currentOrganization = useSecurityConsoleStore((state) => state.currentOrganization)
+  const logout = useSecurityConsoleStore((state) => state.logout)
+  const notifications = useSecurityConsoleStore((state) => state.notifications)
+  const markNotificationRead = useSecurityConsoleStore((state) => state.markNotificationRead)
+  const markAllNotificationsRead = useSecurityConsoleStore((state) => state.markAllNotificationsRead)
+  const canRunSimulation = useSecurityConsoleStore((state) => state.can("run_simulation"))
+  const canGenerateReport = useSecurityConsoleStore((state) => state.can("generate_report"))
   const { theme, toggleTheme } = useTheme()
   const { state: sidebarState } = useSidebar()
   const [query, setQuery] = useState("")
@@ -215,8 +213,8 @@ export function SiteHeader() {
           <Button
             size="sm"
             onClick={() => void runExecutiveDemo()}
-            disabled={!can("run_simulation")}
-            title={!can("run_simulation") ? "Bu aksiyon için uygun rol gerekir." : undefined}
+            disabled={!canRunSimulation}
+            title={!canRunSimulation ? "Bu aksiyon için uygun rol gerekir." : undefined}
             className="hidden lg:inline-flex"
           >
             <PlayIcon />
@@ -227,8 +225,8 @@ export function SiteHeader() {
             size="icon-sm"
             aria-label="Hızlı rapor üret"
             onClick={() => generateReport()}
-            disabled={!can("generate_report")}
-            title={!can("generate_report") ? "Bu aksiyon için rapor üretme yetkisi gerekir." : undefined}
+            disabled={!canGenerateReport}
+            title={!canGenerateReport ? "Bu aksiyon için rapor üretme yetkisi gerekir." : undefined}
           >
             <FileTextIcon />
           </Button>
