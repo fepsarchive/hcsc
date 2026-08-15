@@ -55,6 +55,28 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function commandAvailable(command, args, timeoutMs = 5_000) {
+  return new Promise((resolvePromise) => {
+    const child = spawn(command, args, {
+      env: { PATH: process.env.PATH ?? "" },
+      shell: false,
+      stdio: "ignore",
+    });
+    const timeout = setTimeout(() => {
+      child.kill("SIGTERM");
+      resolvePromise(false);
+    }, timeoutMs);
+    child.once("error", () => {
+      clearTimeout(timeout);
+      resolvePromise(false);
+    });
+    child.once("close", (code) => {
+      clearTimeout(timeout);
+      resolvePromise(code === 0);
+    });
+  });
+}
+
 async function readJsonBody(request) {
   const chunks = [];
   let bytes = 0;
@@ -276,8 +298,17 @@ await mkdir(artifactsRoot, { recursive: true });
 
 const server = createServer(async (request, response) => {
   if (request.method === "GET" && request.url === "/healthz") {
-    return sendJson(response, runnerToken && callbackUrl && callbackToken && allowedTargets.size ? 200 : 503, {
-      ready: Boolean(runnerToken && callbackUrl && callbackToken && allowedTargets.size),
+    const [strixReady, dockerReady] = await Promise.all([
+      commandAvailable(strixBinary, ["--version"], 30_000),
+      commandAvailable("docker", ["info"]),
+    ]);
+    const configured = Boolean(runnerToken && callbackUrl && callbackToken && allowedTargets.size);
+    const ready = configured && strixReady && dockerReady;
+    return sendJson(response, ready ? 200 : 503, {
+      ready,
+      configured,
+      strixReady,
+      dockerReady,
       queueDepth: queue.length,
       active: workerActive,
     });

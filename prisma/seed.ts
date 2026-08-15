@@ -215,7 +215,7 @@ const ZeroTrustDecision = {
   isolate: "isolate",
 } as const;
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required to run prisma/seed.ts");

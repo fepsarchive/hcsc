@@ -282,5 +282,7 @@ test("Strix callback and runner enforce token, allowlist and idempotent findings
   assert.match(runnerSource, /STRIX_ALLOWED_TARGETS/);
   assert.match(runnerSource, /allowedTargets\.has\(target\)/);
   assert.match(runnerSource, /shell:\s*false/);
+  assert.match(runnerSource, /strixReady/);
+  assert.match(runnerSource, /dockerReady/);
   assert.doesNotMatch(runnerSource, /env:\s*process\.env/);
 });

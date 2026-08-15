@@ -18,7 +18,7 @@ STRIX_RUNNER_TOKEN=outbound-hcsc-to-runner-token
 STRIX_RUNNER_CALLBACK_TOKEN=runner-to-hcsc-callback-token
 HCSC_CALLBACK_URL=https://hcsc.example/api/adversary-validation/provider/callback
 STRIX_ALLOWED_TARGETS=https://github.com/fepsarchive/hcsc
-STRIX_BINARY=strix
+STRIX_BINARY=/home/runner/.strix/bin/strix
 STRIX_RUNNER_ARTIFACTS_DIR=/var/lib/hcsc-strix-runs
 STRIX_LLM=openai/your-approved-model
 LLM_API_KEY=your-provider-key
@@ -34,6 +34,6 @@ npm run check
 npm start
 ```
 
-Önce `GET /healthz` yanıtının `200` olduğunu doğrulayın. Gerçek tarama ancak HCSC hedef kaydında aktif yazılı izin bulunduğunda başlatılmalıdır.
+Önce `GET /healthz` yanıtının `200` olduğunu ve `strixReady` ile `dockerReady` alanlarının `true` döndüğünü doğrulayın. Gerçek tarama ancak HCSC hedef kaydında aktif yazılı izin bulunduğunda başlatılmalıdır.
 
 Üretimde runner'ı özel ağda, ayrı servis hesabıyla, salt-okunur host yüzeyi ve sınırlı egress ile çalıştırın. Docker socket erişimi yüksek yetkidir; mümkünse ayrık VM veya disposable runner kullanın.
