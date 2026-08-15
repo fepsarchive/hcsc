@@ -22,6 +22,9 @@ const jobs = new Map();
 const queue = [];
 let workerActive = false;
 
+const callbackMaxAttempts = 3;
+const callbackRetryBaseMs = 750;
+
 function normalizeTarget(value) {
   if (typeof value !== "string") return "";
   try {
@@ -125,22 +128,43 @@ function buildInstructions(job) {
 }
 
 async function postCallback(job, status, extras = {}) {
-  const response = await fetch(callbackUrl, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${callbackToken}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      hcscRunId: job.hcscRunId,
-      externalRunId: job.externalRunId,
-      status,
-      findings: [],
-      ...extras,
-    }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error(`HCSC callback rejected update (${response.status}).`);
+  let lastError = new Error("HCSC callback delivery failed.");
+
+  for (let attempt = 1; attempt <= callbackMaxAttempts; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(callbackUrl, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${callbackToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          hcscRunId: job.hcscRunId,
+          externalRunId: job.externalRunId,
+          status,
+          findings: [],
+          ...extras,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      lastError = error instanceof Error ? error : lastError;
+    }
+
+    if (response?.ok) return;
+    if (response) {
+      lastError = new Error(`HCSC callback rejected update (${response.status}).`);
+      if (response.status < 500 && response.status !== 429) throw lastError;
+    }
+    if (attempt < callbackMaxAttempts) {
+      await new Promise((resolvePromise) => {
+        setTimeout(resolvePromise, callbackRetryBaseMs * 2 ** (attempt - 1));
+      });
+    }
+  }
+
+  throw lastError;
 }
 
 async function findFiles(directory, filename, depth = 0) {

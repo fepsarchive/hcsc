@@ -916,6 +916,7 @@ async function hydrateEnvironmentFromApi(options?: { silent?: boolean }) {
 
   try {
     const allowSettings = hasPermission(currentMeta.currentUser?.role, "manage_settings");
+    const allowAuditLogs = hasPermission(currentMeta.currentUser?.role, "view_audit_logs");
 
     const [
       assets,
@@ -937,7 +938,9 @@ async function hydrateEnvironmentFromApi(options?: { silent?: boolean }) {
       getDeceptionAssets(),
       getCurrentCompliance(),
       getReports(),
-      getAuditLogs().catch(() => currentMeta.auditLogs),
+      allowAuditLogs
+        ? getAuditLogs().catch(() => currentMeta.auditLogs)
+        : Promise.resolve([]),
       getNotifications(),
       getSimulations().catch(() => ({
         simulations: currentEnvironment.simulations,

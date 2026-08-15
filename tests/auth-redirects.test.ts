@@ -7,6 +7,7 @@ import { sanitizeSecurityMetadata } from "../src/lib/security-metadata";
 import { calculateEventRisk, getRiskLevel } from "../src/lib/security-risk-scoring";
 import {
   getEffectiveSecurityTestAuthorizationStatus,
+  isSecurityTestRunTransitionAllowed,
   isSecurityTestAuthorizationActive,
   normalizeSecurityTestScope,
 } from "../src/lib/security-test-policy";
@@ -239,6 +240,25 @@ test("security test scope normalization trims and deduplicates entries", () => {
   assert.deepEqual(normalizeSecurityTestScope("/api/*, /admin/*\n/api/*\n"), ["/api/*", "/admin/*"]);
 });
 
+test("security test run lifecycle cannot move backwards after a terminal status", () => {
+  assert.equal(isSecurityTestRunTransitionAllowed("queued", "running"), true);
+  assert.equal(isSecurityTestRunTransitionAllowed("running", "completed"), true);
+  assert.equal(isSecurityTestRunTransitionAllowed("completed", "completed"), true);
+  assert.equal(isSecurityTestRunTransitionAllowed("completed", "running"), false);
+  assert.equal(isSecurityTestRunTransitionAllowed("failed", "completed"), false);
+  assert.equal(isSecurityTestRunTransitionAllowed("cancelled", "queued"), false);
+});
+
+test("API hydration only requests audit logs for authorized roles", () => {
+  const storeSource = readFileSync(
+    new URL("../src/store/security-console-store.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(storeSource, /allowAuditLogs\s*=\s*hasPermission\([^;]+"view_audit_logs"\)/);
+  assert.match(storeSource, /allowAuditLogs\s*\?\s*getAuditLogs\(\)/);
+});
+
 test("adversary validation enforces permission, explicit authorization and production lock", () => {
   const routeSource = readFileSync(
     new URL("../src/app/api/adversary-validation/runs/route.ts", import.meta.url),
@@ -279,10 +299,14 @@ test("Strix callback and runner enforce token, allowlist and idempotent findings
   assert.match(callbackAuthSource, /STRIX_RUNNER_CALLBACK_TOKEN/);
   assert.match(serviceSource, /securityTestFinding\.upsert/);
   assert.match(serviceSource, /EXTERNAL_RUN_MISMATCH/);
+  assert.match(serviceSource, /INVALID_RUN_STATUS_TRANSITION/);
+  assert.match(serviceSource, /providerCallback/);
   assert.match(runnerSource, /STRIX_ALLOWED_TARGETS/);
   assert.match(runnerSource, /allowedTargets\.has\(target\)/);
   assert.match(runnerSource, /shell:\s*false/);
   assert.match(runnerSource, /strixReady/);
   assert.match(runnerSource, /dockerReady/);
+  assert.match(runnerSource, /callbackMaxAttempts\s*=\s*3/);
+  assert.match(runnerSource, /response\.status\s*<\s*500/);
   assert.doesNotMatch(runnerSource, /env:\s*process\.env/);
 });

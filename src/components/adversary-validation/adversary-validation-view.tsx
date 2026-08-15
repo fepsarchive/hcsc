@@ -218,12 +218,14 @@ export function AdversaryValidationView() {
   const [targetForm, setTargetForm] = useState<TargetForm>(createEmptyTargetForm);
   const [runForm, setRunForm] = useState<RunForm>(() => createEmptyRunForm());
 
-  const loadOverview = useCallback(async () => {
+  const loadOverview = useCallback(async (options?: { silent?: boolean }) => {
     try {
       const result = await getAdversaryValidationOverview();
       setOverview(result);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Adversary Validation verileri yüklenemedi.");
+      if (!options?.silent) {
+        toast.error(error instanceof Error ? error.message : "Adversary Validation verileri yüklenemedi.");
+      }
     } finally {
       setLoading(false);
     }
@@ -252,11 +254,31 @@ export function AdversaryValidationView() {
     };
   }, [canView]);
 
+  useEffect(() => {
+    if (!canView || overview.metrics.activeRuns === 0) return;
+
+    const refreshActiveRuns = () => {
+      if (document.visibilityState === "visible") {
+        void loadOverview({ silent: true });
+      }
+    };
+    const intervalId = window.setInterval(refreshActiveRuns, 5_000);
+    window.addEventListener("focus", refreshActiveRuns);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshActiveRuns);
+    };
+  }, [canView, loadOverview, overview.metrics.activeRuns]);
+
   const findings = overview.runs.flatMap((run) =>
     run.findings.map((finding) => ({ ...finding, runId: run.id, targetName: run.target.name })),
   );
   const runnableTargets = overview.targets.filter(
-    (target) => target.isEnabled && target.authorizationStatus === "active",
+    (target) =>
+      target.isEnabled &&
+      target.authorizationStatus === "active" &&
+      (target.environment !== "production" || overview.provider.productionTargetsAllowed),
   );
 
   function openRunSheet(targetId = runnableTargets[0]?.id ?? "") {
@@ -504,7 +526,7 @@ export function AdversaryValidationView() {
               <Field label="Yetkili hedef"><Select required value={runForm.targetId} onValueChange={(value) => setRunForm((current) => ({ ...current, targetId: value }))}><SelectTrigger className="w-full"><SelectValue placeholder="Hedef seçin" /></SelectTrigger><SelectContent>{runnableTargets.map((target) => <SelectItem key={target.id} value={target.id}>{target.name}</SelectItem>)}</SelectContent></Select></Field>
               <Field label="Tarama modu"><Select value={runForm.scanMode} onValueChange={(value: SecurityTestRun["scanMode"]) => setRunForm((current) => ({ ...current, scanMode: value }))}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="quick">Quick</SelectItem><SelectItem value="standard">Standard</SelectItem><SelectItem value="deep">Deep</SelectItem></SelectContent></Select></Field>
               <Field label="Operatör talimatı"><Textarea value={runForm.instructions} onChange={(event) => setRunForm((current) => ({ ...current, instructions: event.target.value }))} placeholder="Önceliklendirilecek akışlar ve kaçınılacak davranışlar" /></Field>
-              <div className="grid gap-4 sm:grid-cols-2"><Field label="Azami bütçe (USD)"><Input type="number" min="0" max="1000" step="0.01" value={runForm.maxBudgetUsd} onChange={(event) => setRunForm((current) => ({ ...current, maxBudgetUsd: event.target.value }))} /></Field><Field label="Azami adım"><Input type="number" min="25" max="500" value={runForm.maxTurns} onChange={(event) => setRunForm((current) => ({ ...current, maxTurns: event.target.value }))} /></Field></div>
+              <div className="grid gap-4 sm:grid-cols-2"><Field label="Azami bütçe (USD)"><Input type="number" min="0.01" max="1000" step="0.01" value={runForm.maxBudgetUsd} onChange={(event) => setRunForm((current) => ({ ...current, maxBudgetUsd: event.target.value }))} /></Field><Field label="Azami adım"><Input type="number" min="25" max="500" value={runForm.maxTurns} onChange={(event) => setRunForm((current) => ({ ...current, maxTurns: event.target.value }))} /></Field></div>
               <div className="rounded-[14px] border border-sky-500/25 bg-sky-500/8 p-4"><div className="flex gap-3"><FlaskConicalIcon className="mt-0.5 size-4 shrink-0 text-sky-600" /><p className="text-xs leading-5 text-[var(--text-secondary)]">Geçerli sağlayıcı: <strong>{overview.provider.label}</strong>. {overview.provider.mode === "demo" ? "Bu koşu dış ağa saldırı göndermez ve sentetik bulgu üretir." : "Bu koşu yapılandırılmış ayrık runner'a iletilir."}</p></div></div>
               <label className="flex cursor-pointer items-start gap-3 rounded-[14px] border border-amber-500/25 bg-amber-500/8 p-4"><Checkbox checked={runForm.confirmed} onCheckedChange={(checked) => setRunForm((current) => ({ ...current, confirmed: checked === true }))} className="mt-0.5" /><span className="text-xs leading-5 text-[var(--text-secondary)]">Seçili hedef için yetkilendirmenin hâlâ geçerli olduğunu ve tanımlı kapsam dışına çıkılmaması gerektiğini onaylıyorum.</span></label>
             </div>

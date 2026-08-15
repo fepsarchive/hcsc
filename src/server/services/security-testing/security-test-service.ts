@@ -11,6 +11,7 @@ import type {
 
 import {
   getEffectiveSecurityTestAuthorizationStatus,
+  isSecurityTestRunTransitionAllowed,
   isSecurityTestAuthorizationActive,
 } from "@/lib/security-test-policy";
 import { prisma } from "@/server/db/prisma";
@@ -40,6 +41,12 @@ export class SecurityTestServiceError extends Error {
 
 function stringArray(value: Prisma.JsonValue | null | undefined) {
   return Array.isArray(value) ? value.map(String) : [];
+}
+
+function jsonObject(value: Prisma.JsonValue | null | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
 }
 
 function mapAuthorization(authorization: {
@@ -621,6 +628,13 @@ export async function applySecurityTestProviderCallback(input: {
   if (run.externalRunId && run.externalRunId !== input.externalRunId) {
     throw new SecurityTestServiceError("Provider koşu kimliği eşleşmiyor.", "EXTERNAL_RUN_MISMATCH", 409);
   }
+  if (!isSecurityTestRunTransitionAllowed(run.status, input.status)) {
+    throw new SecurityTestServiceError(
+      `Provider koşusu ${run.status} durumundan ${input.status} durumuna geçirilemez.`,
+      "INVALID_RUN_STATUS_TRANSITION",
+      409,
+    );
+  }
 
   const terminalStatuses: SecurityTestRunStatus[] = ["completed", "failed", "cancelled"];
   const wasTerminal = terminalStatuses.includes(run.status);
@@ -685,8 +699,12 @@ export async function applySecurityTestProviderCallback(input: {
         highCount,
         finishedAt: isTerminal ? new Date() : null,
         metadata: {
-          source: "provider_callback",
-          ...(input.metadata ?? {}),
+          ...jsonObject(run.metadata),
+          providerCallback: {
+            source: "provider_callback",
+            status: input.status,
+            ...(input.metadata ?? {}),
+          },
         } as Prisma.InputJsonValue,
       },
     });

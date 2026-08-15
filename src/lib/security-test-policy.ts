@@ -3,6 +3,30 @@ export type SecurityTestAuthorizationSnapshot = {
   expiresAt: string | Date;
 };
 
+export type SecurityTestRunLifecycleStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "blocked";
+
+const allowedRunTransitions: Record<SecurityTestRunLifecycleStatus, readonly SecurityTestRunLifecycleStatus[]> = {
+  queued: ["queued", "running", "completed", "failed", "cancelled"],
+  running: ["running", "completed", "failed", "cancelled"],
+  completed: ["completed"],
+  failed: ["failed"],
+  cancelled: ["cancelled"],
+  blocked: ["blocked"],
+};
+
+export function isSecurityTestRunTransitionAllowed(
+  current: SecurityTestRunLifecycleStatus,
+  next: SecurityTestRunLifecycleStatus,
+) {
+  return allowedRunTransitions[current].includes(next);
+}
+
 export function isSecurityTestAuthorizationActive(
   authorization: SecurityTestAuthorizationSnapshot | null | undefined,
   now = new Date(),

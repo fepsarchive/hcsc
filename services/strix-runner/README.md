@@ -7,7 +7,7 @@ Bu servis, HCSC web uygulaması ile Strix CLI arasında küçük ve ayrık bir k
 - Node.js 20+
 - Çalışır durumda Docker
 - Kurulu ve sürümü sabitlenmiş Strix CLI
-- Strix için `STRIX_LLM` ve `LLM_API_KEY`
+- Strix için `STRIX_LLM` ile API anahtarı veya runner servis hesabında tamamlanmış ChatGPT oturumu
 - Yalnızca açıkça yetkilendirilmiş hedeflerden oluşan allowlist
 
 ## Ortam değişkenleri
@@ -25,6 +25,7 @@ LLM_API_KEY=your-provider-key
 ```
 
 `STRIX_ALLOWED_TARGETS` tam URL eşleşmesi kullanır. HTTP hedefleri kabul edilmez. Runner tek seferde bir koşu işleyerek artifact klasörü seçiminin deterministik kalmasını sağlar.
+HCSC callback teslimi ağ hataları, `429` ve `5xx` yanıtlarında artan bekleme süresiyle üç kez denenir; diğer `4xx` yanıtları yapılandırma hatası kabul edilerek hemen durdurulur.
 
 ## Başlatma
 
