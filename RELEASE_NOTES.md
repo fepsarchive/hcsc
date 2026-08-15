@@ -1,3 +1,30 @@
+# HCSC v2.0 Backend Security Foundation
+
+## Added
+- Security Event Engine foundation with organization-scoped create/list/detail/status/metrics functions.
+- Data Asset Inventory foundation on the existing `Asset` model with inventory metadata, risk fields, create/update APIs, and safe demo seed data.
+- Deterministic Risk Scoring service for event, asset, user, organization, and security health calculations.
+- `/api/security/events`, `/api/security/events/[id]`, and status update endpoints.
+- High severity notification linkage through the centralized security event service.
+
+## Improved
+- Audit/security event correlation for auth failures, MFA failures, unauthorized admin attempts, role/status/settings updates, report generation, trap triggers, and high-risk asset changes.
+- Trap endpoint event integration while preserving safe 404 responses and rate limiting.
+- Admin overview and security posture backend metrics now use real security event and asset risk data.
+
+## Security
+- Secret-safe metadata sanitization for security events.
+- Organization-scoped security event and data asset queries.
+- Existing System Owner admin guards and server-only Prisma access remain intact.
+- No client-side database access or real trap data exposure was added.
+
+## Verification
+- lint: pass
+- typecheck: pass
+- test: pass (10/10)
+- build: pass
+- prisma validate/generate: pass
+
 # HCSC v1.1 Stable Release
 
 ## Fixed

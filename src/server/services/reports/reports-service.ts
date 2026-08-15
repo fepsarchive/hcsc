@@ -3,6 +3,7 @@ import { createAuditLog } from "@/server/services/audit/audit-log-service";
 import { mapReportRecord } from "@/server/services/core/domain-mappers";
 import { generateReportWithEngine, getPersistedReportWithLinks } from "@/server/services/engines/report-engine.service";
 import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
+import { createSecurityEvent } from "@/server/security/security-event-service";
 
 export async function listReports(organizationId: string) {
   const reports = await prisma.report.findMany({
@@ -299,6 +300,27 @@ export async function generateOrganizationReport(input: {
     details: `${report.title} raporu üretildi.`,
     ipAddress: input.actor.ipAddress,
     device: input.actor.userAgent,
+  });
+
+  await createSecurityEvent({
+    organizationId: input.organizationId,
+    actorUserId: input.actor.userId,
+    actorEmail: null,
+    source: "Reports",
+    category: "report_generated",
+    type: "REPORT_GENERATED",
+    title: `Report generated: ${report.title}`,
+    description: `${report.title} raporu üretildi ve security metrics için kaydedildi.`,
+    severity: "info",
+    riskScore: 8,
+    target: report.title,
+    targetType: "report",
+    targetId: report.id,
+    metadata: {
+      reportId: report.id,
+      reportType: report.type,
+    },
+    notify: false,
   });
 
   await notifyOrganizationMembers({

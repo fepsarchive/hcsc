@@ -114,6 +114,12 @@ export async function getAdminOverviewData() {
     failedLoginAttempts,
     adminActions,
     lockedUsers,
+    totalSecurityEvents,
+    openCriticalSecurityEvents,
+    highRiskAssets,
+    averageAssetRisk,
+    recentUnauthorizedAttempts,
+    recentTrapTriggers,
     assetRiskGroups,
     eventStatusGroups,
     userGrowthGroups,
@@ -131,6 +137,37 @@ export async function getAdminOverviewData() {
     prisma.auditLog.count({ where: { action: "login_failed", createdAt: { gte: today } } }),
     prisma.auditLog.count({ where: { module: "Admin", createdAt: { gte: today } } }),
     prisma.user.count({ where: { status: "suspended" } }),
+    prisma.securityEvent.count(),
+    prisma.securityEvent.count({
+      where: {
+        severity: "critical",
+        status: { in: ["open", "investigating", "contained"] },
+      },
+    }),
+    prisma.asset.count({
+      where: {
+        riskLevel: { in: ["high", "critical"] },
+        inventoryStatus: { not: "ARCHIVED" },
+      },
+    }),
+    prisma.asset.aggregate({
+      where: {
+        inventoryStatus: { not: "ARCHIVED" },
+      },
+      _avg: { riskScore: true },
+    }),
+    prisma.securityEvent.count({
+      where: {
+        category: { in: ["admin_access_denied", "unauthorized_access_attempt"] },
+        createdAt: { gte: today },
+      },
+    }),
+    prisma.securityEvent.count({
+      where: {
+        category: { in: ["trap_triggered", "deception_triggered"] },
+        createdAt: { gte: today },
+      },
+    }),
     prisma.asset.groupBy({ by: ["riskLevel"], _count: { _all: true } }),
     prisma.securityEvent.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.user.groupBy({
@@ -218,6 +255,12 @@ export async function getAdminOverviewData() {
     failedLoginAttempts,
     adminActions,
     lockedUsers,
+    totalSecurityEvents,
+    openCriticalSecurityEvents,
+    highRiskAssets,
+    averageOrganizationRiskScore: Math.round(averageAssetRisk._avg.riskScore ?? 0),
+    recentUnauthorizedAttempts,
+    recentTrapTriggers,
     systemStatus: "Operational",
     healthScore: health.healthScore,
     health,

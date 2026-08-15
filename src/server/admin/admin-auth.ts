@@ -15,6 +15,7 @@ import {
 } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 import { getSystemOwnerConfig, isSystemOwner } from "@/server/auth/system-owner";
+import { createSecurityEvent } from "@/server/security/security-event-service";
 
 export type AdminSessionContext = NonNullable<Awaited<ReturnType<typeof getSessionContext>>>;
 
@@ -151,5 +152,80 @@ export async function logAdminSecurityEvent(input: {
       device: input.device ?? input.session.userAgent ?? null,
       metadata: input.metadata,
     },
+  });
+
+  await createAdminSecurityEvent(input).catch(() => null);
+}
+
+async function createAdminSecurityEvent(input: {
+  session: AdminSessionContext;
+  action: string;
+  target: string;
+  result: "success" | "failure" | "blocked";
+  severity: "info" | "warning" | "high" | "critical";
+  details: string;
+  ipAddress?: string | null;
+  device?: string | null;
+  metadata?: Prisma.InputJsonValue;
+}) {
+  const category =
+    input.action.includes("forbidden")
+      ? "admin_access_denied"
+      : input.action.includes("role")
+        ? "role_changed"
+        : input.action.includes("status")
+          ? "status_changed"
+          : input.action.includes("settings")
+            ? "settings_changed"
+            : "admin_access_granted";
+
+  if (
+    ![
+      "admin_access_denied",
+      "admin_access_granted",
+      "role_changed",
+      "status_changed",
+      "settings_changed",
+    ].includes(category)
+  ) {
+    return;
+  }
+
+  const eventSeverity =
+    input.severity === "critical" || input.severity === "high"
+      ? input.severity
+      : input.result === "blocked"
+        ? "medium"
+        : "info";
+
+  await createSecurityEvent({
+    organizationId: input.session.organizationId,
+    actorUserId: input.session.userId,
+    actorEmail: input.session.user.email,
+    source: "Admin",
+    category,
+    type: input.action.toUpperCase(),
+    title:
+      category === "admin_access_denied"
+        ? "Unauthorized admin access attempt"
+        : category === "role_changed"
+          ? "Admin role changed"
+          : category === "status_changed"
+            ? "Admin status changed"
+            : category === "settings_changed"
+              ? "Admin settings changed"
+              : "Admin access granted",
+    description: input.details,
+    severity: eventSeverity,
+    target: input.target,
+    targetType: "admin",
+    ipAddress: input.ipAddress ?? input.session.ipAddress ?? null,
+    userAgent: input.device ?? input.session.userAgent ?? null,
+    metadata: {
+      action: input.action,
+      result: input.result,
+      metadata: input.metadata,
+    },
+    notify: input.result === "blocked" || category === "settings_changed" || category === "role_changed" || category === "status_changed",
   });
 }

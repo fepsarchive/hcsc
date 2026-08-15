@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { resolveAppShellRedirect } from "../src/lib/auth-redirects";
+import { sanitizeSecurityMetadata } from "../src/lib/security-metadata";
+import { calculateEventRisk, getRiskLevel } from "../src/lib/security-risk-scoring";
 import type { AppUser, AuthState } from "../src/types";
 
 const unauthenticated: AuthState = {
@@ -147,5 +149,57 @@ test("trap endpoint remains a safe deception surface with rate limiting", () => 
   assert.match(routeSource, /never returns secrets/);
   assert.match(serviceSource, /TRAP_RATE_LIMIT_MAX_REQUESTS/);
   assert.match(serviceSource, /createAuditLog/);
+  assert.match(serviceSource, /createSecurityEvent/);
+  assert.match(serviceSource, /riskScore:\s*94/);
+});
+
+test("risk score levels are deterministic", () => {
+  assert.equal(getRiskLevel(0), "low");
+  assert.equal(getRiskLevel(24), "low");
+  assert.equal(getRiskLevel(25), "medium");
+  assert.equal(getRiskLevel(50), "high");
+  assert.equal(getRiskLevel(75), "critical");
+});
+
+test("event risk calculation weights critical trap events", () => {
+  const result = calculateEventRisk({
+    severity: "critical",
+    category: "trap_triggered",
+    targetType: "deception_asset",
+  });
+
+  assert.equal(result.level, "critical");
+  assert.ok(result.score >= 75);
+  assert.ok(result.reasons.some((reason) => reason.includes("trap_triggered")));
+});
+
+test("security event metadata sanitizer redacts secrets recursively", () => {
+  const sanitized = sanitizeSecurityMetadata({
+    email: "analyst@hcsc.local",
+    password: "demo123",
+    nested: {
+      sessionToken: "secret-token",
+      safe: "visible",
+    },
+  });
+
+  assert.deepEqual(sanitized, {
+    email: "analyst@hcsc.local",
+    password: "[redacted]",
+    nested: {
+      sessionToken: "[redacted]",
+      safe: "visible",
+    },
+  });
+});
+
+test("high severity security events create notification linkage", () => {
+  const serviceSource = readFileSync(
+    new URL("../src/server/security/security-event-service.ts", import.meta.url),
+    "utf8",
+  );
+
   assert.match(serviceSource, /notifyOrganizationMembers/);
+  assert.match(serviceSource, /shouldNotify/);
+  assert.match(serviceSource, /riskScore/);
 });

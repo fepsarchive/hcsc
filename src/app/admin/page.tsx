@@ -102,6 +102,22 @@ export default async function AdminOverviewPage() {
                 <div className="text-xs text-muted-foreground">Last security scan</div>
                 <div className="mt-1 font-medium">{formatDate(overview.health.lastChecked)}</div>
               </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3">
+                <div className="text-xs text-muted-foreground">Security events</div>
+                <div className="mt-1 font-medium">{overview.totalSecurityEvents}</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3">
+                <div className="text-xs text-muted-foreground">Open critical events</div>
+                <div className="mt-1 font-medium">{overview.openCriticalSecurityEvents}</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3">
+                <div className="text-xs text-muted-foreground">High risk assets</div>
+                <div className="mt-1 font-medium">{overview.highRiskAssets}</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3">
+                <div className="text-xs text-muted-foreground">Avg risk / trap signals</div>
+                <div className="mt-1 font-medium">{overview.averageOrganizationRiskScore} / {overview.recentTrapTriggers}</div>
+              </div>
             </div>
           </CardContent>
         </Card>

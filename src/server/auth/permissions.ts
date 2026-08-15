@@ -3,6 +3,7 @@ import type { Organization, User, UserRole as DbUserRole, UserStatus as DbUserSt
 import { rolePermissions } from "@/lib/permissions";
 import { prisma } from "@/server/db/prisma";
 import { isSystemOwner } from "@/server/auth/system-owner";
+import { createSecurityEvent } from "@/server/security/security-event-service";
 import type { AppUser, OrganizationProfile, Permission, UserRole } from "@/types";
 
 const dbRoleToClientRoleMap: Record<DbUserRole, UserRole> = {
@@ -109,4 +110,22 @@ export async function recordUnauthorizedAction(input: {
       device: input.device ?? null,
     },
   });
+
+  await createSecurityEvent({
+    organizationId: input.organizationId,
+    actorUserId: input.userId ?? null,
+    source: "Authorization",
+    category: "unauthorized_access_attempt",
+    type: "UNAUTHORIZED_ACTION_ATTEMPT",
+    title: "Unauthorized action attempt",
+    description: input.details,
+    severity: "medium",
+    target: input.target,
+    targetType: "api",
+    ipAddress: input.ipAddress,
+    userAgent: input.device,
+    metadata: {
+      actorRole: input.actorRole,
+    },
+  }).catch(() => null);
 }

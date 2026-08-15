@@ -80,6 +80,7 @@ export function riskTone(level: RiskLevel): BadgeTone {
 
 export function severityTone(severity: EventSeverity): BadgeTone {
   const map: Record<EventSeverity, BadgeTone> = {
+    info: "info",
     low: "low",
     medium: "medium",
     high: "high",

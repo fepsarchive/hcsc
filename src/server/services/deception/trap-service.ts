@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { prisma } from "@/server/db/prisma";
 import { createAuditLog } from "@/server/services/audit/audit-log-service";
-import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
+import { createSecurityEvent } from "@/server/security/security-event-service";
 
 const TRAP_RATE_LIMIT_WINDOW_MS = 60_000;
 const TRAP_RATE_LIMIT_MAX_REQUESTS = 30;
@@ -98,30 +98,36 @@ export async function triggerTrapForRequest(trapSlug: string, request: NextReque
     },
   });
 
-  const event = await prisma.securityEvent.create({
-    data: {
-      organizationId: deceptionAsset.organizationId,
-      title: `${deceptionAsset.name} trap endpoint probe`,
-      severity: "critical",
-      category: "deception_triggered",
-      source: "Trap Endpoint",
-      target: deceptionAsset.name,
-      description:
-        "Safe deception trap endpoint received an external probe. No real resource or secret was exposed.",
-      relatedControl: "Active Defense / Trap Endpoint",
-      recommendation:
-        "Review source telemetry, correlate with existing events, and consider isolating related identities or tokens.",
-      status: "open",
-      evidence: {
-        method: request.method,
-        requestPath,
-        sourceIp,
-        observedAt: occurredAt.toISOString(),
-        headerSubset: safeHeaders,
-      },
-      playbookActions: ["notify_security_team", "create_ticket", "require_mfa", "revoke_token"],
-      relatedDeceptionAssetId: deceptionAsset.id,
+  const event = await createSecurityEvent({
+    organizationId: deceptionAsset.organizationId,
+    title: `${deceptionAsset.name} trap endpoint probe`,
+    severity: "critical",
+    category: "trap_triggered",
+    type: "TRAP_TRIGGERED",
+    source: "Trap Endpoint",
+    target: deceptionAsset.name,
+    targetType: "deception_asset",
+    targetId: deceptionAsset.id,
+    description:
+      "Safe deception trap endpoint received an external probe. No real resource or secret was exposed.",
+    relatedControl: "Active Defense / Trap Endpoint",
+    recommendation:
+      "Review source telemetry, correlate with existing events, and consider isolating related identities or tokens.",
+    status: "open",
+    riskScore: 94,
+    evidence: {
+      method: request.method,
+      requestPath,
+      sourceIp,
+      observedAt: occurredAt.toISOString(),
+      headerSubset: safeHeaders,
     },
+    metadata: {
+      safeResponse: "404 Resource unavailable",
+      containsRealData: false,
+    },
+    playbookActions: ["notify_security_team", "create_ticket", "require_mfa", "revoke_token"],
+    relatedDeceptionAssetId: deceptionAsset.id,
   });
 
   await prisma.eventTimelineEntry.createMany({
@@ -169,17 +175,6 @@ export async function triggerTrapForRequest(trapSlug: string, request: NextReque
       method: request.method,
       requestPath,
     },
-  });
-
-  await notifyOrganizationMembers({
-    organizationId: deceptionAsset.organizationId,
-    title: "Trap endpoint alarm",
-    description: `${updatedDeceptionAsset.name} için güvenli trap endpoint probe kaydedildi.`,
-    type: "deception_alarm",
-    severity: "critical",
-    module: "Trap Endpoint",
-    actionHref: "/deception",
-    roles: ["security_admin", "cloud_security_analyst"],
   });
 
   return {

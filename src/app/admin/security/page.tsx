@@ -129,6 +129,48 @@ export default async function AdminSecurityPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
+            <CardTitle>Top Risky Assets</CardTitle>
+            <CardDescription>Inventory kaynaklı en yüksek riskli varlıklar.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {security.securityMetrics.topRiskyAssets.map((asset) => (
+              <div key={asset.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{asset.name}</span>
+                  <Badge variant="outline">{asset.riskScore}/100</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {asset.classification} / {asset.exposure} / {asset.riskLevel}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Critical Events</CardTitle>
+            <CardDescription>High ve critical security event sinyalleri.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {security.securityMetrics.recentCriticalEvents.map((event) => (
+              <div key={event.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{event.title}</span>
+                  <Badge variant="outline">{event.severity}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {event.category} / {event.status} / risk {event.riskScore}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangleIcon className="size-5 text-amber-300" />
               Recommendations

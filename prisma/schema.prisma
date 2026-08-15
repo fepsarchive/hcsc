@@ -95,6 +95,7 @@ enum RequestStatus {
 }
 
 enum EventSeverity {
+  info
   low
   medium
   high
@@ -106,9 +107,25 @@ enum EventStatus {
   investigating
   contained
   resolved
+  false_positive
 }
 
 enum EventCategory {
+  auth_failure
+  mfa_failure
+  login_success
+  admin_access_denied
+  admin_access_granted
+  settings_changed
+  role_changed
+  status_changed
+  trap_triggered
+  data_asset_risk
+  access_request_created
+  zero_trust_decision
+  compliance_gap
+  system_health_degraded
+  report_generated
   unauthorized_access_attempt
   suspicious_export
   public_bucket_detected
@@ -371,9 +388,15 @@ model OrganizationInvite {
 model Asset {
   id                  String             @id @default(cuid())
   organizationId      String
+  ownerUserId         String?
   name                String
   path                String
+  inventoryType       String?
   dataType            String
+  description         String?
+  exposure            String             @default("internal")
+  environment         String             @default("hybrid")
+  provider            String?
   location            CloudLocation
   storageType         StorageType
   classification      DataClassification
@@ -395,6 +418,8 @@ model Asset {
   riskReasons         Json
   recommendedControls Json
   findings            Json
+  tags                Json?
+  inventoryStatus     String             @default("ACTIVE")
   isDeception         Boolean            @default(false)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
@@ -477,21 +502,31 @@ model AccessRequest {
 model SecurityEvent {
   id                      String        @id @default(cuid())
   organizationId          String
+  actorUserId             String?
+  actorEmail              String?
   title                   String
   severity                EventSeverity
   category                EventCategory
+  eventType               String?       @map("type")
   source                  String
   target                  String
+  targetType              String?
+  targetId                String?
   description             String
+  riskScore               Int           @default(0)
+  ipAddress               String?
+  userAgent               String?
   relatedControl          String?
   recommendation          String?
   status                  EventStatus   @default(open)
   evidence                Json
+  metadata                Json?
   playbookActions         Json
   relatedAssetId          String?
   relatedIdentityId       String?
   relatedAccessRequestId  String?
   relatedDeceptionAssetId String?
+  resolvedAt              DateTime?
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
 
@@ -700,6 +735,7 @@ model Notification {
   severity       EventSeverity
   module         String
   actionHref     String?
+  metadata       Json?
   readAt         DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

@@ -3,6 +3,7 @@ import { createAuditLog } from "@/server/services/audit/audit-log-service";
 import { mapAssetRecord } from "@/server/services/core/domain-mappers";
 import { recalculateAssetRiskWithEngine } from "@/server/services/engines/risk-engine.service";
 import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
+import { createSecurityEvent } from "@/server/security/security-event-service";
 
 export async function listAssets(
   organizationId: string,
@@ -92,6 +93,27 @@ export async function recalculateAssetRisk(input: {
   });
 
   if (recalculated.asset.riskLevel === "high" || recalculated.asset.riskLevel === "critical") {
+    await createSecurityEvent({
+      organizationId: input.organizationId,
+      actorUserId: input.actor.userId,
+      source: "Asset Risk Engine",
+      category: "data_asset_risk",
+      type: "DATA_ASSET_RISK_RECALCULATED",
+      title: `High risk asset recalculated: ${recalculated.asset.name}`,
+      description: `${recalculated.asset.name} risk skoru ${recalculated.asset.riskScore}/${recalculated.asset.riskLevel} olarak hesaplandı.`,
+      severity: recalculated.asset.riskLevel === "critical" ? "critical" : "high",
+      riskScore: recalculated.asset.riskScore,
+      target: recalculated.asset.name,
+      targetType: "asset",
+      targetId: recalculated.asset.id,
+      relatedAssetId: recalculated.asset.id,
+      metadata: {
+        openCriticalEventCount: recalculated.metrics.openCriticalEventCount,
+        deceptionTriggerCount: recalculated.metrics.deceptionTriggerCount,
+      },
+      notify: false,
+    });
+
     await notifyOrganizationMembers({
       organizationId: input.organizationId,
       title: "High risk asset detected",

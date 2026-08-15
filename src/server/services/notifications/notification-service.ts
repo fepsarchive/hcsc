@@ -11,6 +11,7 @@ function buildNotificationPayload(input: {
   severity: EventSeverity;
   module: string;
   actionHref?: string | null;
+  metadata?: Prisma.InputJsonValue | null;
 }) {
   return {
     organizationId: input.organizationId,
@@ -21,6 +22,7 @@ function buildNotificationPayload(input: {
     severity: input.severity,
     module: input.module,
     actionHref: input.actionHref ?? null,
+    metadata: input.metadata ?? undefined,
   } satisfies Prisma.NotificationCreateManyInput;
 }
 
@@ -33,6 +35,7 @@ export async function createNotification(input: {
   severity: EventSeverity;
   module: string;
   actionHref?: string | null;
+  metadata?: Prisma.InputJsonValue | null;
 }) {
   return prisma.notification.create({
     data: buildNotificationPayload(input),
@@ -47,6 +50,7 @@ export async function notifyOrganizationMembers(input: {
   severity: EventSeverity;
   module: string;
   actionHref?: string | null;
+  metadata?: Prisma.InputJsonValue | null;
   roles?: Array<"security_admin" | "cloud_security_analyst" | "compliance_officer" | "auditor" | "executive">;
 }) {
   const memberships = await prisma.membership.findMany({
@@ -74,6 +78,7 @@ export async function notifyOrganizationMembers(input: {
         severity: input.severity,
         module: input.module,
         actionHref: input.actionHref,
+        metadata: input.metadata,
       }),
     ),
   });

@@ -7,9 +7,11 @@ export function SeverityBadge({ severity }: { severity: EventSeverity }) {
       ? "critical"
       : severity === "high"
         ? "high"
-        : severity === "medium"
-          ? "medium"
-          : "low";
+      : severity === "medium"
+        ? "medium"
+        : severity === "info"
+          ? "info"
+        : "low";
 
   return <Badge label={severity} tone={tone} />;
 }

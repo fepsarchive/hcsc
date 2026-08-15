@@ -8,6 +8,21 @@ import {
 import { makeId, playbookActionLabel } from "@/lib/utils";
 
 const defaultPlaybooks: Record<EventCategory, SoarAction[]> = {
+  auth_failure: ["require_mfa", "notify_security_team"],
+  mfa_failure: ["require_mfa", "notify_security_team"],
+  login_success: ["notify_security_team"],
+  admin_access_denied: ["create_ticket", "notify_security_team"],
+  admin_access_granted: ["notify_security_team"],
+  settings_changed: ["create_ticket"],
+  role_changed: ["create_ticket", "notify_security_team"],
+  status_changed: ["create_ticket"],
+  trap_triggered: ["isolate_identity", "revoke_token", "notify_security_team"],
+  data_asset_risk: ["create_ticket", "notify_security_team"],
+  access_request_created: ["create_ticket"],
+  zero_trust_decision: ["require_mfa", "create_ticket", "notify_security_team"],
+  compliance_gap: ["create_ticket"],
+  system_health_degraded: ["create_ticket", "notify_security_team"],
+  report_generated: ["notify_security_team"],
   unauthorized_access_attempt: ["require_mfa", "create_ticket", "notify_security_team"],
   suspicious_export: ["require_mfa", "revoke_token", "create_ticket", "notify_security_team"],
   public_bucket_detected: ["isolate_resource", "create_ticket", "notify_security_team"],
@@ -23,6 +38,7 @@ const defaultPlaybooks: Record<EventCategory, SoarAction[]> = {
 };
 
 const severityScoreMap: Record<EventSeverity, number> = {
+  info: 5,
   low: 18,
   medium: 42,
   high: 68,

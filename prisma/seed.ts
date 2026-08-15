@@ -72,6 +72,21 @@ const DeviceTrust = {
 } as const;
 
 const EventCategory = {
+  auth_failure: "auth_failure",
+  mfa_failure: "mfa_failure",
+  login_success: "login_success",
+  admin_access_denied: "admin_access_denied",
+  admin_access_granted: "admin_access_granted",
+  settings_changed: "settings_changed",
+  role_changed: "role_changed",
+  status_changed: "status_changed",
+  trap_triggered: "trap_triggered",
+  data_asset_risk: "data_asset_risk",
+  access_request_created: "access_request_created",
+  zero_trust_decision: "zero_trust_decision",
+  compliance_gap: "compliance_gap",
+  system_health_degraded: "system_health_degraded",
+  report_generated: "report_generated",
   unauthorized_access_attempt: "unauthorized_access_attempt",
   suspicious_export: "suspicious_export",
   public_bucket_detected: "public_bucket_detected",
@@ -87,6 +102,7 @@ const EventCategory = {
 } as const;
 
 const EventSeverity = {
+  info: "info",
   low: "low",
   medium: "medium",
   high: "high",
@@ -98,6 +114,7 @@ const EventStatus = {
   investigating: "investigating",
   contained: "contained",
   resolved: "resolved",
+  false_positive: "false_positive",
 } as const;
 
 const IdentityStatus = {
@@ -486,6 +503,62 @@ async function upsertSettings() {
   }
 }
 
+function buildAssetInventoryExtras(asset: {
+  id: string;
+  name: string;
+  location: (typeof CloudLocation)[keyof typeof CloudLocation];
+  storageType: (typeof StorageType)[keyof typeof StorageType];
+  classification: (typeof DataClassification)[keyof typeof DataClassification];
+  owner: string;
+  privacyTags: readonly string[];
+  isDeception: boolean;
+}) {
+  const environment =
+    asset.location === CloudLocation.saas
+      ? "saas"
+      : asset.location === CloudLocation.private_cloud
+        ? "on_prem"
+        : asset.location === CloudLocation.deception
+          ? "hybrid"
+          : "cloud";
+  const exposure =
+    asset.location === CloudLocation.public_cloud
+      ? "shared"
+      : asset.location === CloudLocation.saas
+        ? "shared"
+        : asset.location === CloudLocation.deception
+          ? "unknown"
+          : "internal";
+  const inventoryType =
+    asset.storageType === StorageType.database
+      ? "DATABASE"
+      : asset.storageType === StorageType.object_storage
+        ? "STORAGE_BUCKET"
+        : asset.storageType === StorageType.deception_storage
+          ? "DECEPTION_TRAP_ENDPOINT"
+          : asset.storageType === StorageType.backup_archive
+            ? "REPORT"
+            : "CLOUD_SERVICE";
+
+  return {
+    ownerUserId: "user_security_admin",
+    inventoryType,
+    description: `${asset.name} demo inventory item for HCSC v2 backend foundation.`,
+    exposure,
+    environment,
+    provider:
+      asset.location === CloudLocation.public_cloud
+        ? "AWS"
+        : asset.location === CloudLocation.saas
+          ? "CUSTOM"
+          : asset.location === CloudLocation.deception
+            ? "CUSTOM"
+            : "NEON",
+    tags: [...asset.privacyTags, asset.owner, asset.classification],
+    inventoryStatus: asset.isDeception ? "REVIEW_REQUIRED" : "ACTIVE",
+  };
+}
+
 async function upsertAssets() {
   const assets = [
     {
@@ -704,9 +777,118 @@ async function upsertAssets() {
       findings: ["Retention review should continue."],
       isDeception: false,
     },
+    {
+      id: "asset_admin_console",
+      name: "Admin Console",
+      path: "saas/admin-console",
+      dataType: "Privileged Admin Console",
+      location: CloudLocation.saas,
+      storageType: StorageType.saas_export,
+      classification: DataClassification.critical,
+      temperature: DataTemperature.hot,
+      owner: "Platform Security",
+      encryptionEnabled: true,
+      kmsEnabled: true,
+      backupEnabled: true,
+      kvkkScope: false,
+      gdprScope: false,
+      privacyTags: ["Admin", "System Owner"],
+      retentionPolicy: "12 months",
+      anonymizationStatus: "not_applicable",
+      accessCount24h: 16,
+      accessIntensity: 42,
+      riskScore: 78,
+      riskLevel: RiskLevel.critical,
+      riskReasons: ["Privileged administration surface", "System owner only access"],
+      recommendedControls: ["System Owner Guard", "2FA", "Audit Log"],
+      findings: ["Admin access must remain system-owner scoped."],
+      isDeception: false,
+    },
+    {
+      id: "asset_authentication_api",
+      name: "Authentication API",
+      path: "saas/authentication-api",
+      dataType: "Session and 2FA API",
+      location: CloudLocation.saas,
+      storageType: StorageType.saas_export,
+      classification: DataClassification.sensitive,
+      temperature: DataTemperature.hot,
+      owner: "Identity Security",
+      encryptionEnabled: true,
+      kmsEnabled: true,
+      backupEnabled: true,
+      kvkkScope: true,
+      gdprScope: true,
+      privacyTags: ["Auth", "2FA", "Session"],
+      retentionPolicy: "12 months",
+      anonymizationStatus: "partial",
+      accessCount24h: 146,
+      accessIntensity: 74,
+      riskScore: 72,
+      riskLevel: RiskLevel.high,
+      riskReasons: ["Authentication control plane", "High request intensity"],
+      recommendedControls: ["Rate Limit", "2FA", "Session Monitoring"],
+      findings: ["Failed auth spikes should create security events."],
+      isDeception: false,
+    },
+    {
+      id: "asset_report_archive",
+      name: "Report Archive",
+      path: "backup/report-archive",
+      dataType: "Generated Security Reports",
+      location: CloudLocation.backup,
+      storageType: StorageType.backup_archive,
+      classification: DataClassification.confidential,
+      temperature: DataTemperature.warm,
+      owner: "Compliance",
+      encryptionEnabled: true,
+      kmsEnabled: true,
+      backupEnabled: true,
+      kvkkScope: true,
+      gdprScope: true,
+      privacyTags: ["Report", "Evidence"],
+      retentionPolicy: "3 years",
+      anonymizationStatus: "partial",
+      accessCount24h: 11,
+      accessIntensity: 18,
+      riskScore: 48,
+      riskLevel: RiskLevel.medium,
+      riskReasons: ["Report evidence retention", "Privacy scope"],
+      recommendedControls: ["Access Review", "Print Audit"],
+      findings: ["Print route must remain authenticated."],
+      isDeception: false,
+    },
+    {
+      id: "asset_compliance_evidence_vault",
+      name: "Compliance Evidence Vault",
+      path: "private-cloud/compliance-evidence-vault",
+      dataType: "Compliance Evidence",
+      location: CloudLocation.private_cloud,
+      storageType: StorageType.file_share,
+      classification: DataClassification.confidential,
+      temperature: DataTemperature.warm,
+      owner: "Compliance",
+      encryptionEnabled: true,
+      kmsEnabled: true,
+      backupEnabled: true,
+      kvkkScope: true,
+      gdprScope: true,
+      privacyTags: ["KVKK", "GDPR", "ISO27001"],
+      retentionPolicy: "5 years",
+      anonymizationStatus: "partial",
+      accessCount24h: 9,
+      accessIntensity: 20,
+      riskScore: 44,
+      riskLevel: RiskLevel.medium,
+      riskReasons: ["Compliance evidence store", "Regulatory scope"],
+      recommendedControls: ["Evidence Integrity", "Access Review"],
+      findings: ["Evidence snapshots should be periodically reviewed."],
+      isDeception: false,
+    },
   ] as const;
 
   for (const asset of assets) {
+    const inventoryExtras = buildAssetInventoryExtras(asset);
     await prisma.asset.upsert({
       where: {
         organizationId_path: {
@@ -716,11 +898,13 @@ async function upsertAssets() {
       },
       update: {
         ...asset,
+        ...inventoryExtras,
         organizationId: ORGANIZATION_ID,
         lastAccessedAt: NOW,
       },
       create: {
         ...asset,
+        ...inventoryExtras,
         organizationId: ORGANIZATION_ID,
         lastAccessedAt: NOW,
       },

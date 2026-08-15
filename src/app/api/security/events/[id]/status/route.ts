@@ -1,10 +1,12 @@
+import { type EventStatus } from "@prisma/client";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireApiAuth } from "@/server/api/require-auth";
 import { apiError, apiOk } from "@/server/api/response";
 import { parseRequestJson } from "@/server/api/validation";
-import { updateEventStatus } from "@/server/services/events/events-service";
+import { mapSecurityEventRecord } from "@/server/services/core/domain-mappers";
+import { updateSecurityEventStatus } from "@/server/security/security-event-service";
 
 const bodySchema = z.object({
   status: z.enum(["open", "investigating", "contained", "resolved", "false_positive"]),
@@ -13,7 +15,7 @@ const bodySchema = z.object({
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAuth(request, {
     permission: "run_playbook",
-    target: "event:update-status",
+    target: "security-events:update-status",
   });
 
   if (!auth.ok) {
@@ -26,22 +28,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const { id } = await params;
-  const updated = await updateEventStatus({
+  const event = await updateSecurityEventStatus({
     organizationId: auth.context.session.organizationId,
-    eventId: id,
-    status: parsed.data.status,
-    actor: {
-      userId: auth.context.session.userId,
-      name: auth.context.user.name,
-      role: auth.context.user.role,
-      ipAddress: auth.context.ipAddress,
-      userAgent: auth.context.userAgent,
-    },
+    id,
+    status: parsed.data.status as EventStatus,
   });
 
-  if (!updated) {
-    return apiError(auth.context.requestId, 404, "NOT_FOUND", "Event bulunamadı.");
+  if (!event) {
+    return apiError(auth.context.requestId, 404, "NOT_FOUND", "Security event bulunamadı.");
   }
 
-  return apiOk(auth.context.requestId, updated);
+  return apiOk(auth.context.requestId, mapSecurityEventRecord(event));
 }

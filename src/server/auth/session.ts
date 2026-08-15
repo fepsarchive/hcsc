@@ -4,6 +4,7 @@ import type { AuditResult, AuditSeverity, Prisma, User } from "@prisma/client";
 import type { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/server/db/prisma";
+import { createSecurityEvent } from "@/server/security/security-event-service";
 
 export const SESSION_COOKIE_NAME = "hcsc_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
@@ -241,7 +242,73 @@ export async function createAuthAuditLog(input: {
       metadata: input.metadata ?? undefined,
     },
   });
+
+  await createAuthSecurityEvent(input).catch(() => null);
 }
 
 export type AuthenticatedSessionContext = Awaited<ReturnType<typeof getSessionContext>>;
 export type AuthenticatedUser = User;
+
+async function createAuthSecurityEvent(input: {
+  organizationId: string;
+  userId?: string | null;
+  actorName: string;
+  actorRole: string;
+  action: string;
+  target: string;
+  result: AuditResult;
+  severity: AuditSeverity;
+  details: string;
+  ipAddress?: string | null;
+  device?: string | null;
+  metadata?: Prisma.InputJsonValue;
+}) {
+  if (!["login_success", "login_failed", "two_factor_failed", "two_factor_verified", "system_owner_login_success"].includes(input.action)) {
+    return;
+  }
+
+  const category =
+    input.action === "login_failed"
+      ? "auth_failure"
+      : input.action === "two_factor_failed"
+        ? "mfa_failure"
+        : input.action === "system_owner_login_success"
+          ? "admin_access_granted"
+          : "login_success";
+  const severity =
+    input.action === "login_failed" || input.action === "two_factor_failed"
+      ? "medium"
+      : "info";
+
+  await createSecurityEvent({
+    organizationId: input.organizationId,
+    actorUserId: input.userId ?? null,
+    actorEmail: input.target.includes("@") ? input.target : null,
+    source: "Authentication",
+    category,
+    type: input.action.toUpperCase(),
+    title:
+      input.action === "login_failed"
+        ? "Login failure detected"
+        : input.action === "two_factor_failed"
+          ? "MFA failure detected"
+          : input.action === "system_owner_login_success"
+            ? "System owner admin access granted"
+            : "Authentication success",
+    description: input.details,
+    severity,
+    status: "open",
+    target: input.target,
+    targetType: "user",
+    targetId: input.userId ?? null,
+    ipAddress: input.ipAddress,
+    userAgent: input.device,
+    metadata: {
+      action: input.action,
+      result: input.result,
+      actorRole: input.actorRole,
+      metadata: input.metadata,
+    },
+    notify: input.action === "login_failed" || input.action === "two_factor_failed" || input.action === "system_owner_login_success",
+  });
+}

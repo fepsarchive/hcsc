@@ -43,9 +43,24 @@ export type RequestStatus =
   | "step_up"
   | "isolated";
 
-export type EventSeverity = "low" | "medium" | "high" | "critical";
-export type EventStatus = "open" | "investigating" | "contained" | "resolved";
+export type EventSeverity = "info" | "low" | "medium" | "high" | "critical";
+export type EventStatus = "open" | "investigating" | "contained" | "resolved" | "false_positive";
 export type EventCategory =
+  | "auth_failure"
+  | "mfa_failure"
+  | "login_success"
+  | "admin_access_denied"
+  | "admin_access_granted"
+  | "settings_changed"
+  | "role_changed"
+  | "status_changed"
+  | "trap_triggered"
+  | "data_asset_risk"
+  | "access_request_created"
+  | "zero_trust_decision"
+  | "compliance_gap"
+  | "system_health_degraded"
+  | "report_generated"
   | "unauthorized_access_attempt"
   | "suspicious_export"
   | "public_bucket_detected"
@@ -370,6 +385,12 @@ export interface SecurityEvent {
   relatedControl: string;
   recommendation: string;
   status: EventStatus;
+  riskScore?: number;
+  eventType?: string;
+  actorUserId?: string | null;
+  actorEmail?: string | null;
+  targetType?: string | null;
+  targetId?: string | null;
   playbookActions: SoarAction[];
   evidence: string[];
   timeline: EventTimelineEntry[];
