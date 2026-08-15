@@ -99,6 +99,7 @@ const EventCategory = {
   policy_violation: "policy_violation",
   third_party_anomaly: "third_party_anomaly",
   visibility_gap: "visibility_gap",
+  security_test_finding: "security_test_finding",
 } as const;
 
 const EventSeverity = {
@@ -138,6 +139,7 @@ const NotificationType = {
   playbook_completed: "playbook_completed",
   access_request_pending: "access_request_pending",
   simulation_completed: "simulation_completed",
+  security_test_completed: "security_test_completed",
 } as const;
 
 const ReportType = {
@@ -1745,6 +1747,161 @@ async function upsertSimulationRun() {
   });
 }
 
+async function upsertAdversaryValidationDemo() {
+  const targetId = "security_test_target_hcsc_repo_demo";
+  const runId = "security_test_run_hcsc_repo_demo";
+
+  await prisma.securityTestTarget.upsert({
+    where: { id: targetId },
+    update: {
+      organizationId: ORGANIZATION_ID,
+      ownerUserId: "user_security_admin",
+      name: "HCSC Repository",
+      targetType: "repository",
+      target: "https://github.com/fepsarchive/hcsc",
+      environment: "sandbox",
+      description: "HCSC Adversary Validation arayüzü için güvenli sentetik demo hedefi.",
+      authorizationStatus: "active",
+      scope: ["Repository source", "Application routes"],
+      exclusions: ["Production infrastructure", "Third-party services"],
+      isEnabled: true,
+    },
+    create: {
+      id: targetId,
+      organizationId: ORGANIZATION_ID,
+      ownerUserId: "user_security_admin",
+      name: "HCSC Repository",
+      targetType: "repository",
+      target: "https://github.com/fepsarchive/hcsc",
+      environment: "sandbox",
+      description: "HCSC Adversary Validation arayüzü için güvenli sentetik demo hedefi.",
+      authorizationStatus: "active",
+      scope: ["Repository source", "Application routes"],
+      exclusions: ["Production infrastructure", "Third-party services"],
+      isEnabled: true,
+    },
+  });
+
+  await prisma.securityTestAuthorization.upsert({
+    where: { id: "security_test_authorization_hcsc_demo" },
+    update: {
+      organizationId: ORGANIZATION_ID,
+      targetId,
+      grantedByUserId: "user_security_admin",
+      reference: "HCSC-DEMO-AUTH-001",
+      scope: ["Repository source", "Application routes"],
+      exclusions: ["Production infrastructure", "Third-party services"],
+      status: "active",
+      expiresAt: new Date("2035-01-01T00:00:00.000Z"),
+      notes: "Yalnızca sentetik demo sağlayıcısı için başlangıç kaydı.",
+    },
+    create: {
+      id: "security_test_authorization_hcsc_demo",
+      organizationId: ORGANIZATION_ID,
+      targetId,
+      grantedByUserId: "user_security_admin",
+      reference: "HCSC-DEMO-AUTH-001",
+      scope: ["Repository source", "Application routes"],
+      exclusions: ["Production infrastructure", "Third-party services"],
+      status: "active",
+      expiresAt: new Date("2035-01-01T00:00:00.000Z"),
+      notes: "Yalnızca sentetik demo sağlayıcısı için başlangıç kaydı.",
+    },
+  });
+
+  await prisma.securityTestRun.upsert({
+    where: { id: runId },
+    update: {
+      organizationId: ORGANIZATION_ID,
+      targetId,
+      requestedByUserId: "user_security_admin",
+      provider: "demo",
+      scanMode: "standard",
+      status: "completed",
+      externalRunId: "demo-hcsc-baseline",
+      summary: "Sentetik başlangıç doğrulaması iki güvenli örnek bulguyla tamamlandı.",
+      findingCount: 2,
+      criticalCount: 0,
+      highCount: 1,
+      costUsd: 0,
+      startedAt: new Date("2026-08-15T08:00:00.000Z"),
+      finishedAt: new Date("2026-08-15T08:00:03.000Z"),
+      metadata: { synthetic: true, networkExecution: false },
+    },
+    create: {
+      id: runId,
+      organizationId: ORGANIZATION_ID,
+      targetId,
+      requestedByUserId: "user_security_admin",
+      provider: "demo",
+      scanMode: "standard",
+      status: "completed",
+      externalRunId: "demo-hcsc-baseline",
+      summary: "Sentetik başlangıç doğrulaması iki güvenli örnek bulguyla tamamlandı.",
+      findingCount: 2,
+      criticalCount: 0,
+      highCount: 1,
+      costUsd: 0,
+      startedAt: new Date("2026-08-15T08:00:00.000Z"),
+      finishedAt: new Date("2026-08-15T08:00:03.000Z"),
+      metadata: { synthetic: true, networkExecution: false },
+    },
+  });
+
+  const findings = [
+    {
+      id: "security_test_finding_hcsc_demo_high",
+      externalId: "DEMO-HCSC-001",
+      title: "[Demo] Yönetim rotasında ek savunma katmanı önerisi",
+      severity: EventSeverity.high,
+      category: "Access control review",
+      description: "Sentetik kontrol, yüksek etkili yönetim rotalarının ek politika doğrulamasıyla korunabileceğini gösterir.",
+      evidence: ["Sentetik bulgu: dış ağ isteği veya exploit çalıştırılmadı."],
+      remediation: "Yönetim rotalarında rol, 2FA ve organization scope kontrollerini birlikte zorunlu tutun.",
+      affectedResource: "/admin/*",
+      cvssScore: 7.1,
+    },
+    {
+      id: "security_test_finding_hcsc_demo_medium",
+      externalId: "DEMO-HCSC-002",
+      title: "[Demo] Güvenlik başlıkları için sürekli kontrol",
+      severity: EventSeverity.medium,
+      category: "Security configuration",
+      description: "Sentetik kontrol, güvenlik başlıklarının release doğrulamasında izlenmesini önerir.",
+      evidence: ["Sentetik politika örneği; gerçek hedef taranmadı."],
+      remediation: "CSP ve diğer güvenlik başlıklarını CI smoke testine ekleyin.",
+      affectedResource: "Application response headers",
+      cvssScore: 5.3,
+    },
+  ] as const;
+
+  for (const finding of findings) {
+    await prisma.securityTestFinding.upsert({
+      where: { id: finding.id },
+      update: {
+        ...finding,
+        organizationId: ORGANIZATION_ID,
+        runId,
+        status: "open",
+        remediation: finding.remediation,
+        pocAvailable: false,
+        isSynthetic: true,
+        metadata: { synthetic: true, networkExecution: false },
+      },
+      create: {
+        ...finding,
+        organizationId: ORGANIZATION_ID,
+        runId,
+        status: "open",
+        remediation: finding.remediation,
+        pocAvailable: false,
+        isSynthetic: true,
+        metadata: { synthetic: true, networkExecution: false },
+      },
+    });
+  }
+}
+
 async function main() {
   await upsertOrganization();
   await upsertUsers();
@@ -1759,6 +1916,7 @@ async function main() {
   await upsertAuditLogs();
   await upsertNotifications();
   await upsertSimulationRun();
+  await upsertAdversaryValidationDemo();
 
   console.log("HCSC v2 foundation seed completed.");
 }

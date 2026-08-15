@@ -175,6 +175,119 @@ export type DeceptionTriggerRecord = {
   eventId?: string | null;
 };
 
+export type SecurityTestFinding = {
+  id: string;
+  externalId: string | null;
+  securityEventId: string | null;
+  title: string;
+  severity: "info" | "low" | "medium" | "high" | "critical";
+  status: "open" | "investigating" | "accepted_risk" | "remediated" | "false_positive";
+  category: string;
+  description: string;
+  evidence: string[];
+  remediation: string;
+  affectedResource: string;
+  cvssScore: number | null;
+  pocAvailable: boolean;
+  isSynthetic: boolean;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SecurityTestTarget = {
+  id: string;
+  name: string;
+  targetType: "repository" | "web_application" | "api";
+  target: string;
+  environment: "sandbox" | "staging" | "production";
+  description: string | null;
+  authorizationStatus: "active" | "expired" | "revoked";
+  scope: string[];
+  exclusions: string[];
+  isEnabled: boolean;
+  authorization: {
+    id: string;
+    reference: string;
+    status: "active" | "expired" | "revoked";
+    startsAt: string;
+    expiresAt: string;
+    scope: string[];
+    exclusions: string[];
+    notes: string | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SecurityTestRun = {
+  id: string;
+  provider: "demo" | "self_hosted" | "managed";
+  scanMode: "quick" | "standard" | "deep";
+  status: "queued" | "running" | "completed" | "failed" | "cancelled" | "blocked";
+  externalRunId: string | null;
+  instructions: string | null;
+  maxBudgetUsd: number | null;
+  maxTurns: number;
+  summary: string | null;
+  findingCount: number;
+  criticalCount: number;
+  highCount: number;
+  costUsd: number | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  target: Pick<SecurityTestTarget, "id" | "name" | "target" | "targetType" | "environment">;
+  findings: SecurityTestFinding[];
+};
+
+export type AdversaryValidationOverview = {
+  provider: {
+    mode: "demo" | "self_hosted" | "managed";
+    ready: boolean;
+    label: string;
+    description: string;
+    attribution: string;
+    liveExecution: boolean;
+    productionTargetsAllowed: boolean;
+  };
+  metrics: {
+    authorizedTargets: number;
+    totalRuns: number;
+    activeRuns: number;
+    openFindings: number;
+    criticalFindings: number;
+    highFindings: number;
+  };
+  targets: SecurityTestTarget[];
+  runs: SecurityTestRun[];
+};
+
+export type SecurityTestTargetCreatePayload = {
+  name: string;
+  targetType: SecurityTestTarget["targetType"];
+  target: string;
+  environment: SecurityTestTarget["environment"];
+  description?: string | null;
+  scope: string[];
+  exclusions: string[];
+  authorizationReference: string;
+  authorizationExpiresAt: string;
+  authorizationNotes?: string | null;
+  explicitAuthorizationConfirmed: true;
+};
+
+export type SecurityTestRunCreatePayload = {
+  targetId: string;
+  scanMode: SecurityTestRun["scanMode"];
+  instructions?: string | null;
+  maxBudgetUsd?: number | null;
+  maxTurns: number;
+  explicitAuthorizationConfirmed: true;
+};
+
 export type SimulationListPayload = {
   simulations: Array<{
     id: string;
@@ -661,5 +774,30 @@ export function acceptTeamInvite(token: string) {
   return request<{ success: boolean; organization: OrganizationProfile }>("/api/team/accept-invite", {
     method: "POST",
     body: { token },
+  });
+}
+
+export function getAdversaryValidationOverview() {
+  return request<AdversaryValidationOverview>("/api/adversary-validation/overview", { method: "GET" });
+}
+
+export function createSecurityTestTarget(payload: SecurityTestTargetCreatePayload) {
+  return request<SecurityTestTarget>("/api/adversary-validation/targets", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function launchSecurityTest(payload: SecurityTestRunCreatePayload) {
+  return request<SecurityTestRun>("/api/adversary-validation/runs", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updateSecurityTestFindingStatus(id: string, status: SecurityTestFinding["status"]) {
+  return request<SecurityTestFinding>(`/api/adversary-validation/findings/${id}/status`, {
+    method: "PATCH",
+    body: { status },
   });
 }

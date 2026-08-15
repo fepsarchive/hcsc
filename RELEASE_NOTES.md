@@ -1,5 +1,11 @@
 # HCSC v2.0 Backend Security Foundation
 
+## Adversary Validation
+- HCSC tasarım dilinde yetkili hedef, güvenlik testi koşusu ve bulgu merkezi eklendi.
+- Demo ve self-hosted runner sağlayıcıları için ayrık provider sınırı kuruldu.
+- Süresi dolmamış yazılı yetki, organization scope ve production kilidi zorunlu hale getirildi.
+- Yüksek/kritik doğrulama bulguları Security Event ve bildirim akışına bağlandı.
+
 ## Added
 - Security Event Engine foundation with organization-scoped create/list/detail/status/metrics functions.
 - Data Asset Inventory foundation on the existing `Asset` model with inventory metadata, risk fields, create/update APIs, and safe demo seed data.

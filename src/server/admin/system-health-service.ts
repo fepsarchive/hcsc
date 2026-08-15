@@ -25,6 +25,7 @@ function isConfigured(key: string) {
 
 export function getRequiredEnvChecks(): EnvCheck[] {
   const ownerConfigured = Boolean(process.env.SYSTEM_OWNER_EMAIL?.trim() || process.env.SYSTEM_OWNER_USER_ID?.trim());
+  const selfHostedSecurityTests = process.env.HCSC_SECURITY_TEST_PROVIDER?.trim() === "self_hosted";
 
   return [
     ...requiredEnvKeys.map((key) => ({
@@ -42,6 +43,11 @@ export function getRequiredEnvChecks(): EnvCheck[] {
       configured: isConfigured("DIRECT_URL"),
       required: false,
     },
+    ...["STRIX_RUNNER_URL", "STRIX_RUNNER_TOKEN", "STRIX_RUNNER_CALLBACK_TOKEN"].map((key) => ({
+      key,
+      configured: isConfigured(key),
+      required: selfHostedSecurityTests,
+    })),
   ];
 }
 

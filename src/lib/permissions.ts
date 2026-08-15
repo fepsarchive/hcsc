@@ -15,6 +15,9 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     "manage_settings",
     "view_audit_logs",
     "run_simulation",
+    "view_security_tests",
+    "manage_security_test_targets",
+    "run_security_test",
     "access_presentation_mode",
   ],
   "Cloud Security Analyst": [
@@ -26,6 +29,8 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     "view_compliance",
     "generate_report",
     "run_simulation",
+    "view_security_tests",
+    "run_security_test",
     "access_presentation_mode",
   ],
   "Compliance Officer": [
@@ -35,6 +40,7 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     "generate_report",
     "print_report",
     "view_audit_logs",
+    "view_security_tests",
     "access_presentation_mode",
   ],
   Auditor: [
@@ -42,6 +48,7 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     "view_assets",
     "view_compliance",
     "view_audit_logs",
+    "view_security_tests",
     "print_report",
     "access_presentation_mode",
   ],
@@ -49,6 +56,7 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     "view_dashboard",
     "generate_report",
     "print_report",
+    "view_security_tests",
     "access_presentation_mode",
   ],
 };

@@ -5,6 +5,11 @@ import test from "node:test";
 import { resolveAppShellRedirect } from "../src/lib/auth-redirects";
 import { sanitizeSecurityMetadata } from "../src/lib/security-metadata";
 import { calculateEventRisk, getRiskLevel } from "../src/lib/security-risk-scoring";
+import {
+  getEffectiveSecurityTestAuthorizationStatus,
+  isSecurityTestAuthorizationActive,
+  normalizeSecurityTestScope,
+} from "../src/lib/security-test-policy";
 import type { AppUser, AuthState } from "../src/types";
 
 const unauthenticated: AuthState = {
@@ -202,4 +207,80 @@ test("high severity security events create notification linkage", () => {
   assert.match(serviceSource, /notifyOrganizationMembers/);
   assert.match(serviceSource, /shouldNotify/);
   assert.match(serviceSource, /riskScore/);
+});
+
+test("security test authorization expires deterministically", () => {
+  const now = new Date("2026-08-15T12:00:00.000Z");
+
+  assert.equal(
+    isSecurityTestAuthorizationActive(
+      { status: "active", expiresAt: "2026-08-16T12:00:00.000Z" },
+      now,
+    ),
+    true,
+  );
+  assert.equal(
+    isSecurityTestAuthorizationActive(
+      { status: "active", expiresAt: "2026-08-14T12:00:00.000Z" },
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    getEffectiveSecurityTestAuthorizationStatus(
+      { status: "revoked", expiresAt: "2030-01-01T00:00:00.000Z" },
+      now,
+    ),
+    "revoked",
+  );
+});
+
+test("security test scope normalization trims and deduplicates entries", () => {
+  assert.deepEqual(normalizeSecurityTestScope("/api/*, /admin/*\n/api/*\n"), ["/api/*", "/admin/*"]);
+});
+
+test("adversary validation enforces permission, explicit authorization and production lock", () => {
+  const routeSource = readFileSync(
+    new URL("../src/app/api/adversary-validation/runs/route.ts", import.meta.url),
+    "utf8",
+  );
+  const serviceSource = readFileSync(
+    new URL("../src/server/services/security-testing/security-test-service.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(routeSource, /permission:\s*"run_security_test"/);
+  assert.match(routeSource, /explicitAuthorizationConfirmed:\s*z\.literal\(true\)/);
+  assert.match(serviceSource, /isSecurityTestAuthorizationActive/);
+  assert.match(serviceSource, /HCSC_SECURITY_TEST_ALLOW_PRODUCTION/);
+  assert.match(serviceSource, /PRODUCTION_TARGET_BLOCKED/);
+});
+
+test("Strix callback and runner enforce token, allowlist and idempotent findings", () => {
+  const callbackSource = readFileSync(
+    new URL("../src/app/api/adversary-validation/provider/callback/route.ts", import.meta.url),
+    "utf8",
+  );
+  const callbackAuthSource = readFileSync(
+    new URL("../src/server/services/security-testing/provider-callback-auth.ts", import.meta.url),
+    "utf8",
+  );
+  const serviceSource = readFileSync(
+    new URL("../src/server/services/security-testing/security-test-service.ts", import.meta.url),
+    "utf8",
+  );
+  const runnerSource = readFileSync(
+    new URL("../services/strix-runner/server.mjs", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(callbackSource, /verifySecurityTestProviderCallback/);
+  assert.match(callbackAuthSource, /timingSafeEqual/);
+  assert.match(callbackAuthSource, /STRIX_RUNNER_CALLBACK_TOKEN/);
+  assert.match(serviceSource, /securityTestFinding\.upsert/);
+  assert.match(serviceSource, /EXTERNAL_RUN_MISMATCH/);
+  assert.match(runnerSource, /STRIX_ALLOWED_TARGETS/);
+  assert.match(runnerSource, /allowedTargets\.has\(target\)/);
+  assert.match(runnerSource, /shell:\s*false/);
+  assert.doesNotMatch(runnerSource, /env:\s*process\.env/);
 });

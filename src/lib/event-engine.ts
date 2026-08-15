@@ -35,6 +35,7 @@ const defaultPlaybooks: Record<EventCategory, SoarAction[]> = {
   policy_violation: ["require_mfa", "create_ticket", "notify_security_team"],
   third_party_anomaly: ["revoke_token", "create_ticket", "notify_security_team"],
   visibility_gap: ["create_ticket", "notify_security_team"],
+  security_test_finding: ["create_ticket", "notify_security_team"],
 };
 
 const severityScoreMap: Record<EventSeverity, number> = {

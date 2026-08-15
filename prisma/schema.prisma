@@ -138,6 +138,7 @@ enum EventCategory {
   policy_violation
   third_party_anomaly
   visibility_gap
+  security_test_finding
 }
 
 enum SoarAction {
@@ -217,6 +218,54 @@ enum NotificationType {
   playbook_completed
   access_request_pending
   simulation_completed
+  security_test_completed
+}
+
+enum SecurityTestTargetType {
+  repository
+  web_application
+  api
+}
+
+enum SecurityTestEnvironment {
+  sandbox
+  staging
+  production
+}
+
+enum SecurityTestAuthorizationStatus {
+  active
+  expired
+  revoked
+}
+
+enum SecurityTestProvider {
+  demo
+  self_hosted
+  managed
+}
+
+enum SecurityTestScanMode {
+  quick
+  standard
+  deep
+}
+
+enum SecurityTestRunStatus {
+  queued
+  running
+  completed
+  failed
+  cancelled
+  blocked
+}
+
+enum SecurityTestFindingStatus {
+  open
+  investigating
+  accepted_risk
+  remediated
+  false_positive
 }
 
 enum SessionStatus {
@@ -254,6 +303,10 @@ model Organization {
   notifications       Notification[]
   complianceSnapshots ComplianceSnapshot[]
   simulationRuns      SimulationRun[]
+  securityTestTargets SecurityTestTarget[]
+  securityTestAuthorizations SecurityTestAuthorization[]
+  securityTestRuns    SecurityTestRun[]
+  securityTestFindings SecurityTestFinding[]
   settings            OrganizationSettings?
   riskPolicy          RiskPolicy?
   reportBranding      ReportBranding?
@@ -817,4 +870,112 @@ model SimulationRun {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
+}
+
+model SecurityTestTarget {
+  id                  String                          @id @default(cuid())
+  organizationId      String
+  ownerUserId         String?
+  name                String
+  targetType          SecurityTestTargetType
+  target              String
+  environment         SecurityTestEnvironment
+  description         String?
+  authorizationStatus SecurityTestAuthorizationStatus @default(active)
+  scope               Json
+  exclusions          Json
+  isEnabled           Boolean                         @default(true)
+  createdAt           DateTime                        @default(now())
+  updatedAt           DateTime                        @updatedAt
+
+  organization   Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  authorizations SecurityTestAuthorization[]
+  runs           SecurityTestRun[]
+
+  @@unique([organizationId, target])
+  @@index([organizationId, authorizationStatus, environment])
+}
+
+model SecurityTestAuthorization {
+  id              String                          @id @default(cuid())
+  organizationId  String
+  targetId        String
+  grantedByUserId String
+  reference       String
+  scope           Json
+  exclusions      Json
+  status          SecurityTestAuthorizationStatus @default(active)
+  startsAt        DateTime                        @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  notes           String?
+  createdAt       DateTime                        @default(now())
+  updatedAt       DateTime                        @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  target       SecurityTestTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, expiresAt])
+  @@index([targetId, status, expiresAt])
+}
+
+model SecurityTestRun {
+  id                String                @id @default(cuid())
+  organizationId    String
+  targetId          String
+  requestedByUserId String
+  provider          SecurityTestProvider
+  scanMode          SecurityTestScanMode
+  status            SecurityTestRunStatus @default(queued)
+  externalRunId     String?
+  instructions      String?
+  maxBudgetUsd      Float?
+  maxTurns          Int                   @default(150)
+  summary           String?
+  findingCount      Int                   @default(0)
+  criticalCount     Int                   @default(0)
+  highCount         Int                   @default(0)
+  costUsd           Float?
+  errorMessage      String?
+  metadata          Json?
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  target       SecurityTestTarget     @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  findings     SecurityTestFinding[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([targetId, createdAt])
+}
+
+model SecurityTestFinding {
+  id                String                    @id @default(cuid())
+  organizationId    String
+  runId             String
+  externalId        String?
+  securityEventId   String?
+  title             String
+  severity          EventSeverity
+  status            SecurityTestFindingStatus @default(open)
+  category          String
+  description       String
+  evidence          Json
+  remediation       String
+  affectedResource  String
+  cvssScore         Float?
+  pocAvailable      Boolean                   @default(false)
+  isSynthetic       Boolean                   @default(false)
+  metadata          Json?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          SecurityTestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, externalId])
+  @@index([organizationId, severity, status, createdAt])
+  @@index([runId, severity])
 }

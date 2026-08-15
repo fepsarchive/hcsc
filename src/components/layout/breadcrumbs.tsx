@@ -8,6 +8,7 @@ const labels: Record<string, string> = {
   "access-requests": "Erişim Talepleri",
   "policy-engine": "Policy Engine",
   deception: "Deception",
+  "adversary-validation": "Adversary Validation",
   events: "Event Center",
   compliance: "Uyumluluk",
   "threat-matrix": "Threat Matrix",

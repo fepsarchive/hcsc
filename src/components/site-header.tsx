@@ -65,6 +65,10 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     title: "Deception",
     description: "Deception varlıkları ve aktif savunma görünümü",
   },
+  "/adversary-validation": {
+    title: "Adversary Validation",
+    description: "Yetkili hedefler, güvenlik testi koşuları ve doğrulanmış bulgular",
+  },
   "/events": {
     title: "Events",
     description: "SIEM / SOAR olay listesi ve playbook akışları",
@@ -105,6 +109,7 @@ const pageMeta: Record<string, { title: string; description: string }> = {
 
 const quickTargets = [
   { href: "/events", label: "Events" },
+  { href: "/adversary-validation", label: "Adversary Validation" },
   { href: "/reports", label: "Reports" },
   { href: "/simulations", label: "Simulations" },
   { href: "/data-assets", label: "Data Assets" },

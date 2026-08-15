@@ -72,7 +72,8 @@ export type EventCategory =
   | "privilege_escalation"
   | "policy_violation"
   | "third_party_anomaly"
-  | "visibility_gap";
+  | "visibility_gap"
+  | "security_test_finding";
 
 export type SoarAction =
   | "account_lock"
@@ -128,6 +129,9 @@ export type Permission =
   | "manage_settings"
   | "view_audit_logs"
   | "run_simulation"
+  | "view_security_tests"
+  | "manage_security_test_targets"
+  | "run_security_test"
   | "access_presentation_mode";
 
 export interface AppUser {
@@ -213,7 +217,12 @@ export type AuditAction =
   | "system_owner_api_forbidden"
   | "admin_user_role_updated"
   | "admin_user_status_updated"
-  | "admin_settings_updated";
+  | "admin_settings_updated"
+  | "security_test_target_created"
+  | "security_test_run_started"
+  | "security_test_run_completed"
+  | "security_test_run_failed"
+  | "security_test_finding_status_updated";
 
 export interface AuditLogItem {
   id: string;
@@ -238,7 +247,8 @@ export type NotificationType =
   | "compliance_changed"
   | "playbook_completed"
   | "access_request_pending"
-  | "simulation_completed";
+  | "simulation_completed"
+  | "security_test_completed";
 
 export interface NotificationItem {
   id: string;

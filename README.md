@@ -12,6 +12,7 @@ Hybrid Cloud Security Console (HCSC), hibrit bulut güvenliği için tasarlanmı
 - organization-scoped API ve backend security engines
 - trap endpoint, print payload ve release-safe report flow
 - settings içinde security ve team management yüzeyleri
+- yetkili hedef, koşu ve bulgu yönetimi sunan Adversary Validation alanı
 
 ## Local kurulum
 
@@ -63,6 +64,8 @@ Aşağıdaki değişkenler production’da tanımlanmalıdır:
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 - `SYSTEM_OWNER_EMAIL` veya `SYSTEM_OWNER_USER_ID`
+- `HCSC_SECURITY_TEST_PROVIDER` (`demo` varsayılan; `self_hosted` ayrık runner)
+- `HCSC_SECURITY_TEST_ALLOW_PRODUCTION` (varsayılan `false`)
 
 Notlar:
 
@@ -70,6 +73,17 @@ Notlar:
 - Admin console erişimi tekil system owner modelindedir; production’da `SYSTEM_OWNER_EMAIL` veya `SYSTEM_OWNER_USER_ID` tanımlanmalıdır.
 - `RECOVERY_CODE_HASH_KEY` ayrı tanımlanmalı; `SESSION_SECRET` fallback olarak bırakılmamalıdır.
 - `UPSTASH_*` env yoksa local development için in-memory rate limit fallback çalışır. Production’da merkezi Redis tavsiye edilir.
+- `self_hosted` provider için `STRIX_RUNNER_URL`, `STRIX_RUNNER_TOKEN` ve ayrı bir `STRIX_RUNNER_CALLBACK_TOKEN` gerekir; runner Vercel uygulamasından ayrı çalıştırılmalıdır.
+
+## Adversary Validation güvenlik sınırı
+
+- Her hedef organization scope, yazılı izin referansı, kapsam, hariç tutulan alanlar ve bitiş tarihiyle kaydedilir.
+- Her koşuda izin süresi ve kullanıcı yetkisi sunucuda yeniden doğrulanır.
+- Varsayılan `demo` provider dış ağa istek veya exploit göndermez; yalnızca açıkça sentetik bulgular üretir.
+- Production hedefleri ayrıca `HCSC_SECURITY_TEST_ALLOW_PRODUCTION=true` olmadan engellenir.
+- Strix tabanlı aktif yürütme, uygulamanın içine gömülmez; kimlik doğrulamalı ayrık runner adaptörüne iletilir.
+- Runner istek ve callback sözleşmesi [`docs/strix-runner-contract.md`](docs/strix-runner-contract.md) içinde tanımlıdır.
+- Ayrık runner başlangıç servisi [`services/strix-runner`](services/strix-runner) altında bulunur; Strix binary'sini shell kullanmadan çalıştırır ve SARIF çıktısını HCSC bulgularına dönüştürür.
 
 ## Auth ve güvenlik yüzeyleri
 
