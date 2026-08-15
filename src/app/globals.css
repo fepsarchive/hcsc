@@ -4,6 +4,9 @@
 @import "shadcn/tailwind.css";
 
 :root {
+  --hcsc-ui-scale: 0.9;
+  --hcsc-scaled-viewport-width: 111.111111vw;
+  --hcsc-scaled-viewport-height: 111.111111svh;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
   --border: oklch(0.922 0 0);
@@ -54,6 +57,11 @@
 }
 
 @theme inline {
+  --breakpoint-sm: 36rem;
+  --breakpoint-md: 43.2rem;
+  --breakpoint-lg: 57.6rem;
+  --breakpoint-xl: 72rem;
+  --breakpoint-2xl: 86.4rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
@@ -188,11 +196,35 @@ body {
 }
 
 body {
+  width: var(--hcsc-scaled-viewport-width);
+  height: var(--hcsc-scaled-viewport-height);
+  min-height: var(--hcsc-scaled-viewport-height);
+  zoom: var(--hcsc-ui-scale);
   font-family: var(--font-manrope), sans-serif;
   font-size: 14px;
   letter-spacing: -0.01em;
   background: var(--shell-background);
   color: var(--foreground);
+}
+
+/*
+ * Keep the entire product at the same density as browser zoom 90% while the
+ * browser itself stays at 100%. Viewport utilities are compensated so every
+ * full-screen shell still reaches all four viewport edges after scaling.
+ */
+.h-svh {
+  height: var(--hcsc-scaled-viewport-height) !important;
+}
+
+.min-h-svh {
+  min-height: var(--hcsc-scaled-viewport-height) !important;
+}
+
+@media (min-width: 43.2rem) {
+  [data-slot="sidebar-inset"].h-svh {
+    height: calc(var(--hcsc-scaled-viewport-height) - 1rem) !important;
+    min-height: calc(var(--hcsc-scaled-viewport-height) - 1rem) !important;
+  }
 }
 
 ::selection {
@@ -271,7 +303,7 @@ select {
   grid-template-columns: minmax(0, 1fr);
 }
 
-@media (min-width: 1380px) and (min-height: 820px) {
+@media (min-width: 1242px) and (min-height: 738px) {
   .auth-layout {
     grid-template-columns: minmax(0, 1.2fr) minmax(440px, 540px);
   }
@@ -287,7 +319,7 @@ select {
   }
 }
 
-@media (max-height: 820px) {
+@media (max-height: 738px) {
   .auth-shell-card {
     padding: 0.875rem;
     border-radius: 1.375rem;
@@ -366,6 +398,28 @@ select {
   .auth-recovery-codes {
     min-height: 7rem !important;
     line-height: 1.25rem;
+  }
+}
+
+@media print {
+  body {
+    width: auto;
+    height: auto;
+    min-height: 0;
+    zoom: 1;
+  }
+
+  .h-svh {
+    height: 100vh !important;
+  }
+
+  .min-h-svh {
+    min-height: 100vh !important;
+  }
+
+  [data-slot="sidebar-inset"].h-svh {
+    height: auto !important;
+    min-height: 100vh !important;
   }
 }
 
