@@ -50,55 +50,55 @@ export function AuthShell({
   sideFooter,
 }: AuthShellProps) {
   return (
-    <main className="min-h-svh bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_24%),var(--background)] px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100svh-2.5rem)] w-full max-w-[1500px] gap-4 xl:grid-cols-[minmax(0,1.28fr)_minmax(420px,500px)]">
-        <section className="hidden min-w-0 overflow-hidden p-10 xl:flex xl:flex-col xl:justify-between xl:px-10 xl:py-12">
+    <main className="h-svh overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_24%),var(--background)] p-3 sm:p-4 lg:p-5">
+      <div className="auth-layout mx-auto grid h-full w-full max-w-[1500px] gap-4">
+        <section className="auth-side hidden min-h-0 min-w-0 overflow-hidden p-8 2xl:px-10 2xl:py-11">
           <div>
             <Badge variant="outline" className="gap-2">
               <ShieldCheckIcon className="size-4" />
               {badge}
             </Badge>
-            <h1 className="mt-10 max-w-[50rem] text-balance text-[3.45rem] font-semibold leading-[0.98] tracking-tight text-[var(--text-primary)] xl:text-[4.25rem]">
+            <h1 className="mt-8 max-w-[50rem] text-balance text-[clamp(3rem,4.3vw,4.25rem)] font-semibold leading-[0.98] tracking-tight text-[var(--text-primary)]">
               {sideTitle}
             </h1>
-            <p className="mt-8 max-w-[44rem] text-[1.06rem] leading-9 text-[var(--text-secondary)]">{sideDescription}</p>
+            <p className="mt-6 max-w-[44rem] text-base leading-8 text-[var(--text-secondary)]">{sideDescription}</p>
           </div>
 
           {sideFooter ? (
-            <div className="pt-14">{sideFooter}</div>
+            <div className="pt-10">{sideFooter}</div>
           ) : (
             <div className="grid gap-3 lg:grid-cols-3">
               {sideHighlights.map((item) => (
                 <div
                   key={item.title}
-                  className="rounded-[28px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,transparent)] p-5"
+                  className="rounded-[26px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,transparent)] p-4"
                 >
                   <div className="flex size-10 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
                     <SparklesIcon className="size-4" />
                   </div>
-                  <p className="mt-4 text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
-                  <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">{item.description}</p>
+                  <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{item.description}</p>
                 </div>
               ))}
             </div>
           )}
         </section>
 
-        <section className="flex min-w-0 items-center justify-center">
-          <div className="w-full rounded-[32px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_94%,transparent)] p-5 shadow-[0_26px_90px_rgba(0,0,0,0.22)] backdrop-blur sm:p-6 lg:p-7">
-            <Badge variant="outline" className="gap-2 xl:hidden">
+        <section className="flex min-h-0 min-w-0 items-center justify-center">
+          <div className="auth-shell-card w-full max-w-[560px] rounded-[28px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_94%,transparent)] p-4 shadow-[0_26px_90px_rgba(0,0,0,0.22)] backdrop-blur sm:p-5 lg:p-6">
+            <Badge variant="outline" className="auth-mobile-badge gap-2">
               <ShieldCheckIcon className="size-4" />
               {badge}
             </Badge>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">{eyebrow}</p>
-            <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+            <p className="auth-eyebrow mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">{eyebrow}</p>
+            <h2 className="auth-title mt-3 text-balance text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
               {title}
             </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">{description}</p>
+            <p className="auth-description mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">{description}</p>
 
-            <div className="mt-6">{children}</div>
+            <div className="auth-content mt-5">{children}</div>
 
-            {footer ? <div className="mt-6 border-t border-[var(--border)] pt-5">{footer}</div> : null}
+            {footer ? <div className="auth-footer mt-5 border-t border-[var(--border)] pt-4">{footer}</div> : null}
           </div>
         </section>
       </div>

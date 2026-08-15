@@ -24,7 +24,9 @@
     "db:studio": "prisma studio",
     "owner:check": "tsx scripts/ensure-system-owner.ts check",
     "owner:fix": "tsx scripts/ensure-system-owner.ts fix",
-    "owner:reset-password": "tsx scripts/ensure-system-owner.ts reset-password"
+    "owner:reset-password": "tsx scripts/ensure-system-owner.ts reset-password",
+    "auth:test-user": "tsx scripts/ensure-test-auth-user.ts",
+    "api:inventory": "tsx scripts/api-inventory.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

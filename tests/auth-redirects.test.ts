@@ -11,6 +11,7 @@ import {
   isSecurityTestAuthorizationActive,
   normalizeSecurityTestScope,
 } from "../src/lib/security-test-policy";
+import { isTestAuthBypassAllowed } from "../src/lib/test-auth-policy";
 import type { AppUser, AuthState } from "../src/types";
 
 const unauthenticated: AuthState = {
@@ -208,6 +209,24 @@ test("high severity security events create notification linkage", () => {
   assert.match(serviceSource, /notifyOrganizationMembers/);
   assert.match(serviceSource, /shouldNotify/);
   assert.match(serviceSource, /riskScore/);
+});
+
+test("test auth bypass is restricted to one non-admin account outside production", () => {
+  const base = {
+    enabled: "true",
+    email: "ui.test@hcsc.local",
+    configuredEmail: "ui.test@hcsc.local",
+    platformRole: "USER" as const,
+    isSystemOwner: false,
+  };
+
+  assert.equal(isTestAuthBypassAllowed({ ...base, nodeEnv: "development" }), true);
+  assert.equal(isTestAuthBypassAllowed({ ...base, nodeEnv: "test" }), true);
+  assert.equal(isTestAuthBypassAllowed({ ...base, nodeEnv: "production" }), false);
+  assert.equal(isTestAuthBypassAllowed({ ...base, nodeEnv: "development", enabled: "false" }), false);
+  assert.equal(isTestAuthBypassAllowed({ ...base, nodeEnv: "development", email: "analyst@hcsc.local" }), false);
+  assert.equal(isTestAuthBypassAllowed({ ...base, nodeEnv: "development", platformRole: "ADMIN" }), false);
+  assert.equal(isTestAuthBypassAllowed({ ...base, nodeEnv: "development", isSystemOwner: true }), false);
 });
 
 test("security test authorization expires deterministically", () => {

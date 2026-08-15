@@ -6,6 +6,7 @@ import { sanitizeSecurityMetadata } from "@/lib/security-metadata";
 import { prisma } from "@/server/db/prisma";
 import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
 import { calculateEventRisk } from "@/server/security/risk-scoring-service";
+import { dispatchIntegrationEvent } from "@/server/integrations/integration-endpoint-service";
 
 export { sanitizeSecurityMetadata } from "@/lib/security-metadata";
 
@@ -107,6 +108,27 @@ export async function createSecurityEvent(input: {
         riskScore: event.riskScore,
       },
     });
+  }
+
+  await dispatchIntegrationEvent(input.organizationId, "security_event", {
+    id: event.id,
+    category: event.category,
+    severity: event.severity,
+    status: event.status,
+    riskScore: event.riskScore,
+    title: event.title,
+    description: event.description,
+    target: event.target,
+    createdAt: event.createdAt.toISOString(),
+  }).catch(() => []);
+
+  if (event.category === "report_generated") {
+    await dispatchIntegrationEvent(input.organizationId, "report_ready", {
+      eventId: event.id,
+      title: event.title,
+      target: event.target,
+      createdAt: event.createdAt.toISOString(),
+    }).catch(() => []);
   }
 
   return event;

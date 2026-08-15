@@ -2038,8 +2038,10 @@ const actions: Pick<
 
         if (result.authenticated && result.twoFactorVerified) {
           await hydrateEnvironmentFromApi({ silent: true });
-          return;
         }
+        // A successful server response is authoritative, including an anonymous
+        // response after a cookie expires. Never restore a stale persisted session.
+        return;
       } catch {
         // Network or server failure falls back to persisted mock/session state.
       }
@@ -2100,9 +2102,11 @@ const actions: Pick<
       if (result.success && result.data) {
         applyServerAuthPayload(result.data);
         pushToast({
-          title: "Kimlik doğrulandı",
-          description: "İkinci faktör kodunu doğrulayarak oturumu tamamlayın.",
-          tone: "policy",
+          title: result.data.twoFactorVerified ? "Test oturumu açıldı" : "Kimlik doğrulandı",
+          description: result.data.twoFactorVerified
+            ? "Denetimli development/test oturumu doğrudan çalışma alanına bağlandı."
+            : "İkinci faktör kodunu doğrulayarak oturumu tamamlayın.",
+          tone: result.data.twoFactorVerified ? "success" : "policy",
         });
         pushAuditLog({
           action: "login_success",
@@ -2110,13 +2114,22 @@ const actions: Pick<
           target: result.data.user?.email ?? email,
           severity: "info",
           result: "success",
-          details: "Kullanıcı parolayla doğrulandı, 2FA bekleniyor.",
+          details: result.data.twoFactorVerified
+            ? "Denetimli development/test oturumu açıldı."
+            : "Kullanıcı parolayla doğrulandı, 2FA bekleniyor.",
           actorName: result.data.user?.name ?? email,
           actorRole: result.data.user?.role ?? "Anonymous",
           actorId: result.data.user?.id ?? null,
         });
 
-        return { success: true };
+        if (result.data.twoFactorVerified) {
+          await hydrateEnvironmentFromApi({ silent: true });
+        }
+
+        return {
+          success: true,
+          redirectTo: result.data.redirectTo ?? result.data.nextPath,
+        };
       }
 
       if (!result.success) {

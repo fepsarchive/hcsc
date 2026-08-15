@@ -135,6 +135,7 @@ export default function RegisterPage() {
               <Input
                 id="register-password"
                 type="password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(event) => {
                   setPassword(event.target.value);
@@ -150,6 +151,7 @@ export default function RegisterPage() {
               <Input
                 id="register-password-confirm"
                 type="password"
+                autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(event) => {
                   setConfirmPassword(event.target.value);
@@ -165,13 +167,13 @@ export default function RegisterPage() {
             <Checkbox checked={acceptedTerms} onCheckedChange={(checked) => setAcceptedTerms(Boolean(checked))} />
             <div className="space-y-1">
               <p className="text-sm font-medium text-[var(--text-primary)]">Kullanım şartlarını kabul ediyorum</p>
-              <p className="text-xs leading-5 text-[var(--text-muted)]">
+              <p className="auth-compact-hide text-xs leading-5 text-[var(--text-muted)]">
                 Platform yalnızca savunma, görünürlük ve güvenli operasyon akışları sunar; saldırı veya hack-back içermez.
               </p>
             </div>
           </label>
 
-          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+          <div className="auth-compact-hide rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
             <div className="flex items-start gap-3">
               <CheckCircle2Icon className="mt-0.5 size-4 shrink-0" />
               <p className="leading-6">

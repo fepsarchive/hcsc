@@ -261,6 +261,16 @@ async function upsertOrganization() {
 
 async function upsertUsers() {
   const users = [
+    ...(process.env.NODE_ENV !== "production" ? [{
+      id: "user_ui_test",
+      name: "HCSC UI Test",
+      email: "ui.test@hcsc.local",
+      role: UserRole.cloud_security_analyst,
+      platformRole: PlatformRole.USER,
+      department: "Quality Assurance",
+      avatarInitials: "UT",
+      mfaEnabled: false,
+    }] : []),
     {
       id: "user_security_admin",
       name: "Eyşan Yıldırım",
@@ -269,6 +279,7 @@ async function upsertUsers() {
       platformRole: PlatformRole.ADMIN,
       department: "Security Operations",
       avatarInitials: "EY",
+      mfaEnabled: true,
     },
     {
       id: "user_analyst",
@@ -278,6 +289,7 @@ async function upsertUsers() {
       platformRole: PlatformRole.USER,
       department: "Cloud Security",
       avatarInitials: "ED",
+      mfaEnabled: true,
     },
     {
       id: "user_compliance",
@@ -287,6 +299,7 @@ async function upsertUsers() {
       platformRole: PlatformRole.USER,
       department: "Compliance",
       avatarInitials: "SD",
+      mfaEnabled: true,
     },
     {
       id: "user_auditor",
@@ -296,6 +309,7 @@ async function upsertUsers() {
       platformRole: PlatformRole.USER,
       department: "Audit",
       avatarInitials: "MY",
+      mfaEnabled: true,
     },
     {
       id: "user_executive",
@@ -305,6 +319,7 @@ async function upsertUsers() {
       platformRole: PlatformRole.USER,
       department: "Executive Office",
       avatarInitials: "DA",
+      mfaEnabled: true,
     },
   ] as const;
 
@@ -319,7 +334,7 @@ async function upsertUsers() {
         avatarInitials: user.avatarInitials,
         passwordHash: demoPasswordHash(),
         status: UserStatus.active,
-        mfaEnabled: true,
+        mfaEnabled: user.mfaEnabled,
         lastLoginAt: NOW,
       },
       create: {
@@ -332,7 +347,7 @@ async function upsertUsers() {
         department: user.department,
         avatarInitials: user.avatarInitials,
         status: UserStatus.active,
-        mfaEnabled: true,
+        mfaEnabled: user.mfaEnabled,
         lastLoginAt: NOW,
       },
     });
@@ -363,6 +378,8 @@ async function upsertUsers() {
         role: user.role,
       },
     });
+
+    if (!user.mfaEnabled) continue;
 
     await prisma.twoFactorSecret.upsert({
       where: { userId: user.id },

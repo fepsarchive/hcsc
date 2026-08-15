@@ -36,13 +36,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   createTeamInvite,
+  createIntegrationEndpoint,
+  deleteIntegrationEndpoint,
   disableTeamMember,
   getRecoveryCodeStatus,
+  getIntegrationEndpoints,
   getTeamInvites,
   getTeamMembers,
   HcscApiError,
   regenerateRecoveryCodes,
   revokeTeamInvite,
+  testIntegrationEndpoint,
+  type IntegrationEndpointRecord,
   type RecoveryCodeStatusPayload,
   updateTeamMemberRole,
 } from "@/lib/hcsc-api";
@@ -283,7 +288,7 @@ export function SettingsView() {
 
               <Panel>
                 <SectionHeader icon={<BlocksIcon className="size-5 text-[var(--text-secondary)]" />} eyebrow="API & Integrations" title="API ve entegrasyonlar" description="Hazır bağlantı yüzeyleri, erişim modeli ve devreye alma sırası burada yönetilir." />
-                <IntegrationWorkbench className="mt-5" />
+                <IntegrationWorkbench className="mt-5" disabled={!canManageSettings} />
               </Panel>
             </div>
           </div>
@@ -1165,52 +1170,88 @@ function AppearancePreferencesEditor({
   );
 }
 
-function IntegrationWorkbench({ className }: { className?: string }) {
-  const [requested, setRequested] = useState<string | null>(null);
+function IntegrationWorkbench({ className, disabled = false }: { className?: string; disabled?: boolean }) {
+  const [endpoints, setEndpoints] = useState<IntegrationEndpointRecord[]>([]);
+  const [name, setName] = useState("");
+  const [endpointUrl, setEndpointUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
+
+  async function reload() {
+    try {
+      setEndpoints(await getIntegrationEndpoints());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Endpoint listesi alınamadı.");
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    void getIntegrationEndpoints()
+      .then((items) => {
+        if (!cancelled) setEndpoints(items);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : "Endpoint listesi alınamadı.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
-    <div className={`space-y-3 ${className ?? ""}`}>
-      {[
-        {
-          id: "webhooks",
-          title: "Webhook çıkışları",
-          description: "SOAR, SIEM ve external workflow araçlarına olay ve rapor çıktıları göndermek için hazır yüzey.",
-          status: "ready",
-        },
-        {
-          id: "connectors",
-          title: "Connector kataloğu",
-          description: "Ticketing, messaging ve observability araçları için bağlantı modeli hazırlandı.",
-          status: "planned",
-        },
-        {
-          id: "api-keys",
-          title: "API erişim anahtarları",
-          description: "Scoped access ve read-only token modeli sonraki güvenlik sprintinde açılacak.",
-          status: "planned",
-        },
-      ].map((item) => (
-        <div key={item.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+    <div className={`space-y-4 ${className ?? ""}`}>
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]"><BlocksIcon className="size-4" /></div>
+          <div><p className="text-sm font-medium text-[var(--text-primary)]">İmzalı webhook çıkışı ekle</p><p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">HTTPS endpoint; özel ağ adresleri engellenir. Olaylar HMAC-SHA256 ile imzalanır.</p></div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[0.7fr_1.3fr_auto]">
+          <Input disabled={disabled} value={name} onChange={(event) => setName(event.target.value)} placeholder="SIEM olay akışı" />
+          <Input disabled={disabled} type="url" value={endpointUrl} onChange={(event) => setEndpointUrl(event.target.value)} placeholder="https://hooks.example.com/hcsc" />
+          <Button
+            disabled={disabled || busy || name.trim().length < 2 || !endpointUrl.trim()}
+            onClick={() => {
+              setBusy(true);
+              void createIntegrationEndpoint({ name, endpointUrl, eventTypes: ["security_event", "security_test_completed", "report_ready"] })
+                .then(async (result) => {
+                  setRevealedSecret(result.signingSecret);
+                  setName("");
+                  setEndpointUrl("");
+                  await reload();
+                  toast.success("Endpoint oluşturuldu. İmza anahtarını şimdi kopyala.");
+                })
+                .catch((error) => toast.error(error instanceof Error ? error.message : "Endpoint oluşturulamadı."))
+                .finally(() => setBusy(false));
+            }}
+          >
+            Endpoint ekle
+          </Button>
+        </div>
+      </div>
+
+      {revealedSecret ? (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4">
+          <p className="text-sm font-medium text-[var(--text-primary)]">İmza anahtarı — yalnızca şimdi gösterilir</p>
+          <div className="mt-3 flex gap-2"><Input readOnly value={revealedSecret} className="font-mono text-xs" /><Button variant="outline" onClick={() => { void navigator.clipboard.writeText(revealedSecret); toast.success("İmza anahtarı kopyalandı."); }}><CopyIcon /> Kopyala</Button></div>
+        </div>
+      ) : null}
+
+      {endpoints.length ? endpoints.map((endpoint) => (
+        <div key={endpoint.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{item.description}</p>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-[var(--text-primary)]">{endpoint.name}</p><Badge variant="outline">{endpoint.lastDeliveryStatus ?? "Yeni"}</Badge>{endpoint.lastResponseCode ? <Badge variant="outline">HTTP {endpoint.lastResponseCode}</Badge> : null}</div>
+              <p className="mt-2 truncate text-xs text-[var(--text-muted)]">{endpoint.endpointUrl}</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">security_event · security_test_completed · report_ready</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{item.status === "ready" ? "Hazır" : "Planlandı"}</Badge>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setRequested(item.id);
-                  toast.success(`${item.title} çalışma listesine eklendi.`);
-                }}
-              >
-                {requested === item.id ? "Eklendi" : "İstek oluştur"}
-              </Button>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" disabled={disabled || busy} onClick={() => { setBusy(true); void testIntegrationEndpoint(endpoint.id).then((result) => { toast.success(`Test teslim edildi: HTTP ${result.responseCode ?? "-"}`); return reload(); }).catch((error) => toast.error(error instanceof Error ? error.message : "Test başarısız.")) .finally(() => setBusy(false)); }}><RotateCwIcon /> Test et</Button>
+              <Button variant="outline" disabled={disabled || busy} onClick={() => { setBusy(true); void deleteIntegrationEndpoint(endpoint.id).then(() => { toast.success("Endpoint kaldırıldı."); return reload(); }).catch((error) => toast.error(error instanceof Error ? error.message : "Endpoint kaldırılamadı.")) .finally(() => setBusy(false)); }}>Kaldır</Button>
             </div>
           </div>
         </div>
-      ))}
+      )) : <div className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-center text-sm text-[var(--text-muted)]">Henüz bağlı webhook endpoint’i yok.</div>}
     </div>
   );
 }

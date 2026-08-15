@@ -87,6 +87,7 @@ export default function ResetPasswordPage() {
             <Input
               id="new-password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(event) => {
                 setPassword(event.target.value);
@@ -102,6 +103,7 @@ export default function ResetPasswordPage() {
             <Input
               id="confirm-password"
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => {
                 setConfirmPassword(event.target.value);
@@ -129,7 +131,7 @@ export default function ResetPasswordPage() {
           </Button>
         </form>
 
-        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+        <div className="auth-compact-hide rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
           <div className="flex items-start gap-3">
             <CheckCircle2Icon className="mt-0.5 size-4 shrink-0" />
             <p className="leading-6">

@@ -13,6 +13,9 @@ Hybrid Cloud Security Console (HCSC), hibrit bulut güvenliği için tasarlanmı
 - trap endpoint, print payload ve release-safe report flow
 - settings içinde security ve team management yüzeyleri
 - yetkili hedef, koşu ve bulgu yönetimi sunan Adversary Validation alanı
+- resmi Strix API ile yetkili varlık taraması ve bulgu uzlaştırma
+- SSRF korumalı, HMAC imzalı webhook entegrasyonları
+- canlılık, hazır olma ve gerçek bağımlılık sağlık kontrolleri
 
 ## Local kurulum
 
@@ -64,8 +67,10 @@ Aşağıdaki değişkenler production’da tanımlanmalıdır:
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 - `SYSTEM_OWNER_EMAIL` veya `SYSTEM_OWNER_USER_ID`
-- `HCSC_SECURITY_TEST_PROVIDER` (`demo` varsayılan; `self_hosted` ayrık runner)
+- `HCSC_SECURITY_TEST_PROVIDER` (`demo` varsayılan; `managed` resmi Strix API; `self_hosted` ayrık runner)
 - `HCSC_SECURITY_TEST_ALLOW_PRODUCTION` (varsayılan `false`)
+- `STRIX_API_TOKEN` (`managed` kullanıldığında)
+- `INTEGRATION_ENCRYPTION_KEY`
 
 Notlar:
 
@@ -81,9 +86,10 @@ Notlar:
 - Her koşuda izin süresi ve kullanıcı yetkisi sunucuda yeniden doğrulanır.
 - Varsayılan `demo` provider dış ağa istek veya exploit göndermez; yalnızca açıkça sentetik bulgular üretir.
 - Production hedefleri ayrıca `HCSC_SECURITY_TEST_ALLOW_PRODUCTION=true` olmadan engellenir.
-- Strix tabanlı aktif yürütme, uygulamanın içine gömülmez; kimlik doğrulamalı ayrık runner adaptörüne iletilir.
+- Resmi Strix API bağlantısı ve ayrık runner seçenekleri [`docs/STRIX_INTEGRATION.md`](docs/STRIX_INTEGRATION.md) içinde açıklanır.
 - Runner istek ve callback sözleşmesi [`docs/strix-runner-contract.md`](docs/strix-runner-contract.md) içinde tanımlıdır.
 - Ayrık runner başlangıç servisi [`services/strix-runner`](services/strix-runner) altında bulunur; Strix binary'sini shell kullanmadan çalıştırır ve SARIF çıktısını HCSC bulgularına dönüştürür.
+- İmzalı outbound bağlantı modeli [`docs/WEBHOOK_INTEGRATIONS.md`](docs/WEBHOOK_INTEGRATIONS.md) içinde açıklanır.
 
 ## Auth ve güvenlik yüzeyleri
 
@@ -151,10 +157,11 @@ npm run build
 
 Bu uygulama:
 
-- gerçek saldırı yapmaz
-- exploit çalıştırmaz
+- yalnızca açıkça kayıtlı ve yazılı izinli hedeflerde güvenlik doğrulaması başlatır
+- varsayılan durumda dış hedefe aktif tarama veya exploit göndermez
+- managed/self-hosted Strix çalıştırmasını ayrıca provider kimliği, kapsam ve production kilidiyle sınırlar
 - malware veya ransomware içermez
 - saldırgana saldırmaz
 - aktif karşı saldırı yürütmez
 
-Deception katmanı yalnızca güvenli gözlem, alarm, izolasyon önerisi ve raporlama amacıyla tasarlanmıştır.
+Deception katmanı güvenli gözlem, alarm, izolasyon önerisi ve raporlama amacıyla tasarlanmıştır. Adversary Validation katmanı ise yalnızca yetkili varlıklarda kontrollü zafiyet doğrulaması içindir.

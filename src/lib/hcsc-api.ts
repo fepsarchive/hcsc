@@ -64,6 +64,19 @@ export type SettingsBundle = {
   } | null;
 };
 
+export type IntegrationEndpointRecord = {
+  id: string;
+  name: string;
+  endpointUrl: string;
+  eventTypes: string[];
+  isEnabled: boolean;
+  lastDeliveryStatus: string | null;
+  lastDeliveryAt: string | null;
+  lastResponseCode: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AuthUserPayload = {
   authenticated: boolean;
   requiresTwoFactor?: boolean;
@@ -724,6 +737,22 @@ export function updateOrganizationSettings(payload: {
     method: "PATCH",
     body: payload,
   });
+}
+
+export function getIntegrationEndpoints() {
+  return request<IntegrationEndpointRecord[]>("/api/integrations/endpoints", { method: "GET" });
+}
+
+export function createIntegrationEndpoint(payload: { name: string; endpointUrl: string; eventTypes: Array<"security_event" | "security_test_completed" | "report_ready"> }) {
+  return request<{ endpoint: IntegrationEndpointRecord; signingSecret: string }>("/api/integrations/endpoints", { method: "POST", body: payload });
+}
+
+export function testIntegrationEndpoint(id: string) {
+  return request<{ success: boolean; status: string; responseCode: number | null; deliveryId: string }>(`/api/integrations/endpoints/${id}/test`, { method: "POST" });
+}
+
+export function deleteIntegrationEndpoint(id: string) {
+  return request<{ deleted: true }>(`/api/integrations/endpoints/${id}`, { method: "DELETE" });
 }
 
 export function getSimulations() {

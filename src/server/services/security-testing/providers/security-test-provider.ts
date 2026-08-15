@@ -48,6 +48,10 @@ export type SecurityTestLaunchResult = {
   metadata?: Record<string, unknown>;
 };
 
+export type SecurityTestReconcileResult = Omit<SecurityTestLaunchResult, "status"> & {
+  status: Extract<SecurityTestRunStatus, "queued" | "running" | "completed" | "failed" | "cancelled">;
+};
+
 export type SecurityTestProviderRuntime = {
   mode: SecurityTestProviderName;
   ready: boolean;
@@ -55,4 +59,5 @@ export type SecurityTestProviderRuntime = {
   description: string;
   attribution: string;
   launch(input: SecurityTestLaunchInput): Promise<SecurityTestLaunchResult>;
+  reconcile?(externalRunId: string): Promise<SecurityTestReconcileResult>;
 };

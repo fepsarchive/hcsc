@@ -247,7 +247,7 @@ export default function VerifyTwoFactorPage() {
         <LoadingState
           title="2FA durumu hazırlanıyor"
           description="Kurulum veya doğrulama adımı yükleniyor. Lütfen kısa bir an bekleyin."
-          className="min-h-[320px]"
+          className="min-h-[240px]"
         />
       ) : (
               <div className="space-y-4">
@@ -264,7 +264,7 @@ export default function VerifyTwoFactorPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                       Recovery Codes
                     </p>
-                    <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                    <p className="auth-compact-copy mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                       Authenticator uygulamana erişemediğinde bu tek kullanımlık kodlardan birini kullanarak güvenli giriş yapabilirsin.
                     </p>
                   </div>
@@ -276,9 +276,9 @@ export default function VerifyTwoFactorPage() {
                 <Textarea
                   readOnly
                   value={formattedRecoveryCodes}
-                  className="mt-4 min-h-[220px] rounded-2xl font-mono text-sm leading-7"
+                  className="auth-recovery-codes mt-4 min-h-[180px] rounded-2xl font-mono text-sm leading-7"
                 />
-                <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
+                <div className="auth-compact-hide mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
                   Bu kodların her biri yalnızca bir kez kullanılabilir. Kodları parola yöneticinde veya güvenli bir çevrimdışı kasada sakla.
                 </div>
                 <label className="mt-4 flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
@@ -312,7 +312,7 @@ export default function VerifyTwoFactorPage() {
                     <QrCodeIcon className="size-4 text-cyan-300" />
                     QR ile kur
                   </div>
-                  <div className="mt-4 flex min-h-[220px] items-center justify-center rounded-2xl bg-white p-4">
+                  <div className="auth-qr-frame mt-4 flex min-h-[220px] items-center justify-center rounded-2xl bg-white p-4">
                     {qrCodeDataUrl ? (
                       <Image
                         src={qrCodeDataUrl}
@@ -320,7 +320,7 @@ export default function VerifyTwoFactorPage() {
                         width={220}
                         height={220}
                         unoptimized
-                        className="size-[220px] rounded-xl object-contain"
+                        className="auth-qr-image size-[220px] rounded-xl object-contain"
                       />
                     ) : (
                       <p className="max-w-[180px] text-center text-xs leading-6 text-slate-500">
@@ -339,7 +339,7 @@ export default function VerifyTwoFactorPage() {
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                         Authenticator Setup
                       </p>
-                      <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                      <p className="auth-compact-copy mt-1 text-sm text-[var(--text-secondary)]">
                         Uygulamanda yeni bir TOTP hesabı oluştur ve aşağıdaki anahtarı manuel olarak da ekleyebilirsin.
                       </p>
                     </div>
@@ -357,7 +357,7 @@ export default function VerifyTwoFactorPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                  <div className="auth-compact-hide rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
                     QR kodunu okuttuktan sonra uygulamadaki 6 haneli kodu aşağıya gir. Secret yalnızca kurulum sırasında gösterilir.
                   </div>
                 </div>
@@ -372,7 +372,7 @@ export default function VerifyTwoFactorPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                       Secure Session
                     </p>
-                    <p className="text-sm text-[var(--text-secondary)]">
+                    <p className="auth-compact-copy text-sm text-[var(--text-secondary)]">
                       Authenticator uygulamandaki doğrulama koduyla veya recovery code ile oturumunu tamamla.
                     </p>
                   </div>
@@ -415,7 +415,7 @@ export default function VerifyTwoFactorPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                     {verificationMethod === "totp" ? "6 Haneli Kod" : "Recovery Code"}
                   </p>
-                  <p className="text-sm text-[var(--text-secondary)]">
+                  <p className="auth-compact-copy text-sm text-[var(--text-secondary)]">
                     {mode === "setup"
                       ? "Kurulumu tamamlamak için authenticator uygulamandaki ilk geçerli kodu gir."
                       : verificationMethod === "totp"

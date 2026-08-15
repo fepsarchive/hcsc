@@ -307,6 +307,7 @@ model Organization {
   securityTestAuthorizations SecurityTestAuthorization[]
   securityTestRuns    SecurityTestRun[]
   securityTestFindings SecurityTestFinding[]
+  integrationEndpoints IntegrationEndpoint[]
   settings            OrganizationSettings?
   riskPolicy          RiskPolicy?
   reportBranding      ReportBranding?
@@ -825,6 +826,27 @@ model AppSetting {
   updatedAt   DateTime @updatedAt
 
   updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+model IntegrationEndpoint {
+  id                      String   @id @default(cuid())
+  organizationId          String
+  createdByUserId         String
+  name                    String
+  endpointUrl             String
+  signingSecretCiphertext String
+  eventTypes              Json
+  isEnabled               Boolean  @default(true)
+  lastDeliveryStatus      String?
+  lastDeliveryAt          DateTime?
+  lastResponseCode        Int?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, endpointUrl])
+  @@index([organizationId, isEnabled])
 }
 
 model RiskPolicy {

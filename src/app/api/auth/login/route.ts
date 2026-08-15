@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { mapDbUserToAppUser, mapOrganizationToProfile } from "@/server/auth/permissions";
+import { isTestAuthBypassAllowed } from "@/lib/test-auth-policy";
 import { verifyPassword } from "@/server/auth/password";
 import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
-import { buildRequestMeta, createAuthAuditLog, createPendingSession, setSessionCookie } from "@/server/auth/session";
+import { buildRequestMeta, createAuthAuditLog, createPendingSession, createVerifiedSession, setSessionCookie } from "@/server/auth/session";
 import { isSystemOwner } from "@/server/auth/system-owner";
 import { isTwoFactorEnrolled } from "@/server/auth/two-factor";
 import { prisma } from "@/server/db/prisma";
@@ -123,7 +124,15 @@ export async function POST(request: NextRequest) {
   }
 
   const membership = user.memberships[0];
-  const { rawToken, session } = await createPendingSession({
+  const testAuthBypass = isTestAuthBypassAllowed({
+    nodeEnv: process.env.NODE_ENV,
+    enabled: process.env.HCSC_TEST_AUTH_BYPASS_ENABLED,
+    email: user.email,
+    configuredEmail: process.env.HCSC_TEST_AUTH_BYPASS_EMAIL,
+    platformRole: user.platformRole,
+    isSystemOwner: isSystemOwner(user),
+  });
+  const { rawToken, session } = await (testAuthBypass ? createVerifiedSession : createPendingSession)({
     userId: user.id,
     organizationId: membership.organizationId,
     ipAddress: meta.ipAddress,
@@ -140,11 +149,13 @@ export async function POST(request: NextRequest) {
     userId: user.id,
     actorName: user.name,
     actorRole: mapDbUserToAppUser(user).role,
-    action: "login_success",
+    action: testAuthBypass ? "test_auth_bypass_used" : "login_success",
     target: user.email,
     severity: "info",
     result: "success",
-    details: "Kullanıcı parolayla doğrulandı, 2FA bekleniyor.",
+    details: testAuthBypass
+      ? "Development/test analist hesabı parolayla doğrulandı; denetimli 2FA test geçişi kullanıldı."
+      : "Kullanıcı parolayla doğrulandı, 2FA bekleniyor.",
     ipAddress: meta.ipAddress,
     device: meta.userAgent,
   });
@@ -157,10 +168,11 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({
     data: {
-      requires2FA: true,
-      requiresTwoFactor: true,
+      requires2FA: !testAuthBypass,
+      requiresTwoFactor: !testAuthBypass,
       authenticated: true,
-      twoFactorVerified: false,
+      twoFactorVerified: testAuthBypass,
+      testSession: testAuthBypass,
       sessionStartedAt: session.createdAt.toISOString(),
       user: mapDbUserToAppUser(user),
       organization: mapOrganizationToProfile(membership.organization),
@@ -171,7 +183,7 @@ export async function POST(request: NextRequest) {
         enrolledAt: user.twoFactorSecret?.enrolledAt,
       }),
       nextPath: postAuthPath,
-      redirectTo: "/verify-2fa",
+      redirectTo: testAuthBypass ? postAuthPath : "/verify-2fa",
     },
     meta: { requestId: meta.requestId },
     error: null,

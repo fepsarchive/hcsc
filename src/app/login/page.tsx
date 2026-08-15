@@ -52,7 +52,7 @@ export default function LoginPage() {
     }
 
     setError(null);
-    router.replace("/verify-2fa");
+    router.replace(result.redirectTo ?? "/verify-2fa");
   };
 
   return (
@@ -101,7 +101,7 @@ export default function LoginPage() {
           </div>
 
           {isDevelopment ? (
-            <div className="grid gap-2">
+            <div className="auth-compact-hide grid gap-2">
               {showcasedAccounts.map((account) => (
                 <button
                   key={account.id}

@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/server/db/prisma";
 import { getAdminAccessMode } from "@/server/admin/admin-auth";
 import { getSystemOwnerEnvWarnings } from "@/server/auth/system-owner";
+import { getDependencyHealth } from "@/server/health/dependency-health";
 
 export type EnvCheck = {
   key: string;
@@ -16,6 +17,7 @@ const requiredEnvKeys = [
   "JWT_SECRET",
   "TWO_FACTOR_ENCRYPTION_KEY",
   "RECOVERY_CODE_HASH_KEY",
+  "INTEGRATION_ENCRYPTION_KEY",
   "APP_URL",
 ] as const;
 
@@ -26,6 +28,7 @@ function isConfigured(key: string) {
 export function getRequiredEnvChecks(): EnvCheck[] {
   const ownerConfigured = Boolean(process.env.SYSTEM_OWNER_EMAIL?.trim() || process.env.SYSTEM_OWNER_USER_ID?.trim());
   const selfHostedSecurityTests = process.env.HCSC_SECURITY_TEST_PROVIDER?.trim() === "self_hosted";
+  const managedSecurityTests = process.env.HCSC_SECURITY_TEST_PROVIDER?.trim() === "managed";
 
   return [
     ...requiredEnvKeys.map((key) => ({
@@ -48,6 +51,11 @@ export function getRequiredEnvChecks(): EnvCheck[] {
       configured: isConfigured(key),
       required: selfHostedSecurityTests,
     })),
+    ...["STRIX_API_BASE_URL", "STRIX_API_TOKEN"].map((key) => ({
+      key,
+      configured: key === "STRIX_API_BASE_URL" ? Boolean(process.env[key]?.trim() || managedSecurityTests) : isConfigured(key),
+      required: managedSecurityTests,
+    })),
   ];
 }
 
@@ -67,14 +75,9 @@ function calculateHealthScore(input: {
 
 export async function getAdminSystemHealth() {
   const checkedAt = new Date();
-  const databaseStartedAt = Date.now();
-  let databaseStatus: "healthy" | "degraded" = "healthy";
-
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-  } catch {
-    databaseStatus = "degraded";
-  }
+  const startedAt = Date.now();
+  const dependencies = await getDependencyHealth();
+  const databaseStatus = dependencies.database.status === "healthy" ? "healthy" : "degraded";
 
   const [settings, recentCriticalLogs] = await Promise.all([
     prisma.appSetting.findUnique({ where: { key: "applicationName" } }).catch(() => null),
@@ -83,7 +86,7 @@ export async function getAdminSystemHealth() {
         severity: "critical",
         createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },
-    }),
+    }).catch(() => 0),
   ]);
 
   const envChecks = getRequiredEnvChecks();
@@ -96,23 +99,29 @@ export async function getAdminSystemHealth() {
   return {
     database: {
       status: databaseStatus,
-      latencyMs: Date.now() - databaseStartedAt,
+      latencyMs: dependencies.database.latencyMs,
+      message: dependencies.database.message,
     },
     api: {
-      status: "healthy",
-      message: "Admin API route handlers are available.",
+      status: databaseStatus === "healthy" ? "healthy" : "degraded",
+      message: databaseStatus === "healthy" ? "API and database readiness checks passed." : "API is live but database readiness failed.",
     },
     auth: {
       status: "healthy",
       message: "DB-backed session, 2FA and system-owner guard enabled.",
     },
     storage: {
-      status: "ready",
-      message: "Database-backed records and report snapshots are configured.",
+      status: databaseStatus === "healthy" ? "ready" : "degraded",
+      message: dependencies.database.message,
     },
     prisma: {
       status: databaseStatus === "healthy" ? "healthy" : "degraded",
       message: "Prisma server-only data access boundary active.",
+    },
+    dependencies: {
+      cache: dependencies.cache,
+      mail: dependencies.mail,
+      strix: dependencies.strix,
     },
     environment: process.env.NODE_ENV ?? "development",
     appUrlConfigured: isConfigured("APP_URL"),
@@ -121,7 +130,7 @@ export async function getAdminSystemHealth() {
     lastChecked: checkedAt.toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
     buildInfo: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
-    responseTimeMs: Date.now() - databaseStartedAt,
+    responseTimeMs: Date.now() - startedAt,
     envChecks,
     accessMode,
     warnings,

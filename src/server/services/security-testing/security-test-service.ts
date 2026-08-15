@@ -18,6 +18,7 @@ import { prisma } from "@/server/db/prisma";
 import { createSecurityEvent, updateSecurityEventStatus } from "@/server/security/security-event-service";
 import { createAuditLog } from "@/server/services/audit/audit-log-service";
 import { notifyOrganizationMembers } from "@/server/services/notifications/notification-service";
+import { dispatchIntegrationEvent } from "@/server/integrations/integration-endpoint-service";
 import { getSecurityTestProvider } from "@/server/services/security-testing/providers/provider-registry";
 
 type SecurityTestActor = {
@@ -248,6 +249,41 @@ async function linkHighRiskSecurityTestFindings(input: {
 
 export async function getSecurityTestOverview(organizationId: string) {
   const provider = getSecurityTestProvider();
+  if (provider.mode === "managed" && provider.ready && provider.reconcile) {
+    const activeRuns = await prisma.securityTestRun.findMany({
+      where: { organizationId, provider: "managed", status: { in: ["queued", "running"] }, externalRunId: { not: null } },
+      select: { id: true, externalRunId: true },
+      orderBy: { createdAt: "asc" },
+      take: 5,
+    });
+    await Promise.allSettled(
+      activeRuns.map(async (run) => {
+        if (!run.externalRunId || !provider.reconcile) return;
+        const result = await provider.reconcile(run.externalRunId);
+        await applySecurityTestProviderCallback({
+          runId: run.id,
+          externalRunId: result.externalRunId,
+          status: result.status,
+          summary: result.summary,
+          costUsd: result.costUsd,
+          findings: result.findings.map((finding) => ({
+            externalId: finding.externalId,
+            title: finding.title,
+            severity: finding.severity,
+            category: finding.category,
+            description: finding.description,
+            evidence: finding.evidence,
+            remediation: finding.remediation,
+            affectedResource: finding.affectedResource,
+            cvssScore: finding.cvssScore,
+            pocAvailable: finding.pocAvailable,
+            metadata: finding.metadata,
+          })),
+          metadata: result.metadata,
+        });
+      }),
+    );
+  }
   const [targets, runs] = await Promise.all([
     prisma.securityTestTarget.findMany({
       where: { organizationId },
@@ -561,6 +597,14 @@ export async function launchSecurityTestRun(input: {
           metadata: { runId: run.id },
         }),
       ]);
+      await dispatchIntegrationEvent(input.organizationId, "security_test_completed", {
+        runId: run.id,
+        targetId: target.id,
+        target: target.target,
+        findingCount: result.findings.length,
+        criticalCount,
+        highCount,
+      }).catch(() => []);
     }
 
     const refreshed = await prisma.securityTestRun.findUniqueOrThrow({
@@ -765,6 +809,16 @@ export async function applySecurityTestProviderCallback(input: {
         metadata: { runId: run.id, externalRunId: input.externalRunId },
       }),
     ]);
+    await dispatchIntegrationEvent(run.organizationId, "security_test_completed", {
+      runId: run.id,
+      externalRunId: input.externalRunId,
+      targetId: run.targetId,
+      target: run.target.target,
+      status: input.status,
+      findingCount: updated.findingCount,
+      criticalCount: updated.criticalCount,
+      highCount: updated.highCount,
+    }).catch(() => []);
   }
 
   const refreshed = await prisma.securityTestRun.findUniqueOrThrow({ where: { id: run.id }, include: runInclude });

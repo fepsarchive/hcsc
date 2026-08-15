@@ -17,6 +17,21 @@ export const mockOrganization: OrganizationProfile = {
 
 export const mockAuthAccounts: MockAuthAccount[] = [
   {
+    id: "user-ui-test",
+    name: "HCSC UI Test",
+    email: "ui.test@hcsc.local",
+    role: "Cloud Security Analyst",
+    platformRole: "USER",
+    isSystemOwner: false,
+    avatarInitials: "UT",
+    department: "Quality Assurance",
+    mfaEnabled: false,
+    status: "active",
+    lastLoginAt: "2026-08-15T09:00:00.000Z",
+    password: "demo123",
+    twoFactorCode: "123456",
+  },
+  {
     id: "user-security-admin",
     name: "Eyşan Yıldırım",
     email: "security.admin@hcsc.local",
