@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/server/db/prisma";
+import { evaluateRuntimeReadiness } from "@/lib/runtime-readiness";
 import { getAdminAccessMode } from "@/server/admin/admin-auth";
 import { getSystemOwnerEnvWarnings } from "@/server/auth/system-owner";
 import { getDependencyHealth } from "@/server/health/dependency-health";
@@ -90,10 +91,13 @@ export async function getAdminSystemHealth() {
   ]);
 
   const envChecks = getRequiredEnvChecks();
+  const runtimeReadiness = evaluateRuntimeReadiness(process.env);
   const accessMode = getAdminAccessMode();
   const warnings = [
     ...getSystemOwnerEnvWarnings(),
     ...envChecks.filter((check) => check.required && !check.configured).map((check) => `${check.key} missing`),
+    ...runtimeReadiness.issues.map((issue) => issue.message),
+    ...runtimeReadiness.warnings,
   ];
 
   return {
@@ -132,6 +136,11 @@ export async function getAdminSystemHealth() {
     buildInfo: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
     responseTimeMs: Date.now() - startedAt,
     envChecks,
+    runtimeReadiness: {
+      ready: runtimeReadiness.ready,
+      provider: runtimeReadiness.provider,
+      issueCount: runtimeReadiness.issues.length,
+    },
     accessMode,
     warnings,
     healthScore: calculateHealthScore({
