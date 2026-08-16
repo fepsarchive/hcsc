@@ -14,12 +14,20 @@ function clean(value: string | undefined) {
 export function getSystemOwnerConfig() {
   const ownerUserId = clean(process.env.SYSTEM_OWNER_USER_ID);
   const ownerEmail = clean(process.env.SYSTEM_OWNER_EMAIL)?.toLowerCase() ?? null;
+  const fallbackEnabled = process.env.NODE_ENV !== "production";
 
   return {
     ownerUserId,
     ownerEmail,
     fallbackEmail: SYSTEM_OWNER_FALLBACK_EMAIL,
-    source: ownerUserId ? "SYSTEM_OWNER_USER_ID" : ownerEmail ? "SYSTEM_OWNER_EMAIL" : "seed_fallback",
+    fallbackEnabled,
+    source: ownerUserId
+      ? "SYSTEM_OWNER_USER_ID"
+      : ownerEmail
+        ? "SYSTEM_OWNER_EMAIL"
+        : fallbackEnabled
+          ? "seed_fallback"
+          : "unconfigured",
     envConfigured: Boolean(ownerUserId || ownerEmail),
   };
 }
@@ -37,7 +45,7 @@ export function isSystemOwner(user: OwnerUser | null | undefined) {
     return user.email.toLowerCase() === config.ownerEmail;
   }
 
-  return user.email.toLowerCase() === config.fallbackEmail;
+  return config.fallbackEnabled && user.email.toLowerCase() === config.fallbackEmail;
 }
 
 export function getSystemOwnerEnvWarnings() {
@@ -45,7 +53,11 @@ export function getSystemOwnerEnvWarnings() {
   const warnings: string[] = [];
 
   if (!config.envConfigured) {
-    warnings.push("System owner env missing; seed fallback owner is active.");
+    warnings.push(
+      config.fallbackEnabled
+        ? "System owner env missing; non-production seed fallback owner is active."
+        : "System owner env missing; system-owner access is disabled.",
+    );
   }
 
   return warnings;

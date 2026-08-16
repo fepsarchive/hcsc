@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 
+import { evaluateRuntimeReadiness } from "@/lib/runtime-readiness";
 import { probeDatabase } from "@/server/health/dependency-health";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const database = await probeDatabase();
-  const ready = database.status === "healthy";
+  const [database, configuration] = await Promise.all([
+    probeDatabase(),
+    Promise.resolve(evaluateRuntimeReadiness(process.env)),
+  ]);
+  const ready = database.status === "healthy" && configuration.ready;
 
   return NextResponse.json(
     {
@@ -15,6 +19,11 @@ export async function GET() {
         database: {
           status: database.status,
           latencyMs: database.latencyMs,
+        },
+        configuration: {
+          status: configuration.ready ? "healthy" : "unavailable",
+          issueCount: configuration.issues.length,
+          warningCount: configuration.warnings.length,
         },
       },
       checkedAt: new Date().toISOString(),

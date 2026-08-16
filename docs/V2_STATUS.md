@@ -14,6 +14,9 @@
 10. Resend Password Reset
 11. Distributed Rate Limit
 12. Production Readiness Final Pack
+13. Release Hardening Quality Gate
+14. Production Runtime Readiness Policy
+15. Integration Endpoint Migration
 
 ## Production readiness özeti
 
@@ -26,6 +29,11 @@
 - Team management foundation completed
 - Security headers completed
 - Error / not-found UX completed
+- GitHub Actions kalite kapısı eklendi
+- production readiness health/config politikası eklendi
+- production system-owner seed fallback kapatıldı
+- IntegrationEndpoint migration eklendi
+- tenant ve release sınırı regresyon testleri eklendi
 
 ## Production env checklist
 
@@ -36,10 +44,14 @@
 - `JWT_SECRET`
 - `TWO_FACTOR_ENCRYPTION_KEY`
 - `RECOVERY_CODE_HASH_KEY`
+- `INTEGRATION_ENCRYPTION_KEY`
 - `RESEND_API_KEY`
 - `MAIL_FROM`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
+- `SYSTEM_OWNER_EMAIL` veya `SYSTEM_OWNER_USER_ID`
+- managed Strix için `STRIX_API_TOKEN`
+- self-hosted Strix için runner URL/token/callback token
 
 ## Deploy sonrası smoke test
 
@@ -74,7 +86,11 @@ HCSC deception yüzeyleri:
 
 ## Kalan TODO’lar
 
-- Upstash production env ile canlı smoke test
+- GitHub branch protection içinde `HCSC Quality Gate` required check olarak seçilmeli
+- Vercel projesi repo ve `main` branch’e bağlanmalı
+- production env değerleri Vercel’e girilmeli
+- `npm run db:migrate:deploy` production veritabanında çalıştırılmalı
+- Upstash/Resend/Strix gerçek anahtarlarıyla canlı smoke test
 - multi-organization switcher UX
 - invite acceptance sonrası daha gelişmiş organization selection akışı
 - gerçek cihazda mobil görsel QA
