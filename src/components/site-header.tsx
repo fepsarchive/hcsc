@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils"
 import { useSecurityConsoleStore } from "@/store/security-console-store"
 
 const pageMeta: Record<string, { title: string; description: string }> = {
+  "/domains": { title: "Domain Bağlantıları", description: "Sahiplik doğrulama ve gerçek koruma bağlantısı" },
   "/": {
     title: "Dashboard",
     description: "Genel güvenlik, risk ve operasyon görünümü",
@@ -209,7 +210,7 @@ export function SiteHeader() {
           <Button variant="outline" size="icon-sm" className="lg:hidden" onClick={toggleTheme} aria-label="Tema değiştir">
             {theme === "dark" ? <SunMediumIcon /> : <MoonStarIcon />}
           </Button>
-          <Badge variant="outline">Score {dashboard.securityScore}</Badge>
+          <Badge variant="outline">{environment.assets.length ? `Score ${dashboard.securityScore}` : "Ölçüm yok"}</Badge>
           <Badge variant="outline">Critical {environment.events.filter((event) => event.severity === "critical").length}</Badge>
           <Button variant="outline" size="sm" onClick={toggleTheme} className="hidden lg:inline-flex">
             {theme === "dark" ? <SunMediumIcon /> : <MoonStarIcon />}
@@ -246,7 +247,13 @@ export function SiteHeader() {
                 ) : null}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="z-[70] w-96">
+            <DropdownMenuContent
+              align="end"
+              side="bottom"
+              sideOffset={8}
+              collisionPadding={12}
+              className="z-[70] w-96 max-w-[calc(var(--hcsc-scaled-viewport-width)-2rem)]"
+            >
               <DropdownMenuLabel className="flex items-center justify-between gap-2">
                 <span>Notification Center</span>
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void markAllNotificationsRead()}>

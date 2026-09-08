@@ -217,7 +217,7 @@ export function AdminShell({
             </div>
           </header>
           <main className="hcsc-scrollbar min-h-0 min-w-0 flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
-            <div className="@container/main flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-3 py-3 lg:px-4 lg:py-4">
+            <div className="@container/main flex min-w-0 grow shrink-0 flex-col gap-4 px-3 py-3 lg:px-4 lg:py-4">
               {children}
             </div>
           </main>

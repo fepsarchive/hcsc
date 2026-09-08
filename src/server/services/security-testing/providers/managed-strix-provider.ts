@@ -65,11 +65,11 @@ async function strixRequest(path: string, init?: RequestInit) {
     },
     cache: "no-store",
     signal: AbortSignal.timeout(15_000),
+    redirect: "error",
   });
 
   if (!response.ok) {
-    const body = (await response.text()).slice(0, 300);
-    throw new Error(`Strix API request failed (${response.status})${body ? `: ${body}` : "."}`);
+    throw new Error(`Strix API request failed (${response.status}).`);
   }
   return response.json() as Promise<unknown>;
 }
@@ -166,6 +166,7 @@ function scanResult(scan: StrixScan): SecurityTestReconcileResult {
 }
 
 async function createScanPayload(input: SecurityTestLaunchInput) {
+  const scanTier = { quick: "lite", standard: "standard", deep: "ultra" }[input.scanMode];
   const context = [
     `HCSC authorized target: ${input.target.name}`,
     `Environment: ${input.target.environment}`,
@@ -176,6 +177,7 @@ async function createScanPayload(input: SecurityTestLaunchInput) {
     const repositoryId = await resolveRepositoryId(input.target.target);
     return {
       engagement_type: "code_review",
+      scan_tier: scanTier,
       repository_ids: [repositoryId],
       concerns: input.instructions || undefined,
       focus: input.target.scope.join("\n"),
@@ -188,6 +190,7 @@ async function createScanPayload(input: SecurityTestLaunchInput) {
   const paths = input.target.scope.filter((item) => item.startsWith("/"));
   return {
     engagement_type: "live_test",
+    scan_tier: scanTier,
     domain_ids: [domainId],
     ...(paths.length ? { domain_paths: { [domainId]: paths } } : {}),
     concerns: input.instructions || undefined,
@@ -209,8 +212,9 @@ export function createManagedStrixProvider(): SecurityTestProviderRuntime {
     attribution: "Powered by Strix",
     async launch(input) {
       if (!config().ready) throw new Error("Managed Strix API is not configured.");
+      if (input.maxBudgetUsd != null) throw new Error("Managed Strix credit billing does not support a USD spending cap. Use a self-hosted runner for maxBudgetUsd.");
       const payload = await createScanPayload(input);
-      const created = (await strixRequest("/scans", { method: "POST", body: JSON.stringify(payload) })) as {
+      const created = (await strixRequest("/scans", { method: "POST", headers: { "Idempotency-Key": input.runId }, body: JSON.stringify(payload) })) as {
         scan_id?: string;
         title?: string;
         status?: StrixScanStatus;

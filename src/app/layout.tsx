@@ -32,6 +32,7 @@ export default function RootLayout({
   return (
     <html
       lang="tr"
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
       className={cn("h-full", "antialiased", manrope.variable, plexMono.variable, "font-sans", geist.variable)}
     >

@@ -366,7 +366,7 @@ export async function persistSuccessfulTwoFactorVerification(input: {
       },
     });
 
-    return tx.session.update({
+    const session = await tx.session.update({
       where: { id: input.sessionId },
       data: {
         status: "active",
@@ -391,5 +391,8 @@ export async function persistSuccessfulTwoFactorVerification(input: {
         organization: true,
       },
     });
+    const membership = await tx.membership.findFirst({ where: { userId: session.userId, organizationId: session.organizationId } });
+    if (!membership || session.user.status !== "active") throw new Error("Account or workspace access is no longer active.");
+    return { ...session, user: { ...session.user, role: membership.role } };
   });
 }

@@ -13,7 +13,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts",
-    "ci:verify": "npm run lint && npm run typecheck && npm run test && npm run db:validate && npm run release:check && npm run api:inventory && npm run build",
+    "test:server": "node --conditions=react-server --import tsx --test tests/server/*.spec.ts",
+    "ci:verify": "npm run lint && npm run typecheck && npm run test && npm run test:server && npm run db:validate && npm run release:check && npm run api:inventory && npm run build",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
@@ -36,13 +37,13 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
-    "next": "16.2.4",
+    "next": "^16.3.4",
     "next-themes": "^0.4.6",
     "pg": "^8.20.0",
     "qrcode": "^1.5.4",
@@ -51,7 +52,7 @@
     "react-dom": "19.2.4",
     "recharts": "^3.8.0",
     "resend": "^6.2.0",
-    "shadcn": "^4.7.0",
+    "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tw-animate-css": "^1.4.0",
@@ -66,10 +67,22 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.4",
-    "prisma": "^7.8.0",
+    "eslint-config-next": "^16.3.4",
+    "prisma": "^7.10.0",
+    "shadcn": "^4.7.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "prisma": {
+      "mysql2": "3.24.3"
+    },
+    "tsx": {
+      "esbuild": "0.28.2"
+    }
   }
 }

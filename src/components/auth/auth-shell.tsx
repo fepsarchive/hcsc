@@ -50,8 +50,8 @@ export function AuthShell({
   sideFooter,
 }: AuthShellProps) {
   return (
-    <main className="h-svh overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_24%),var(--background)] p-3 sm:p-4 lg:p-5">
-      <div className="auth-layout mx-auto grid h-full w-full max-w-[1500px] gap-4">
+    <main className="min-h-svh bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_24%),var(--background)] p-3 sm:p-4 lg:p-5">
+      <div className="auth-layout mx-auto grid min-h-[calc(var(--hcsc-scaled-viewport-height)-2.5rem)] w-full max-w-[1500px] gap-4">
         <section className="auth-side hidden min-h-0 min-w-0 overflow-hidden p-8 2xl:px-10 2xl:py-11">
           <div>
             <Badge variant="outline" className="gap-2">

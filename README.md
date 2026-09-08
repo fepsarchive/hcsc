@@ -1,21 +1,24 @@
-# HCSC v2 Production-Ready MVP
+# HCSC — Güvenlik operasyon konsolu
 
 Hybrid Cloud Security Console (HCSC), hibrit bulut güvenliği için tasarlanmış çok kiracılı, API-first ve aktif savunma odaklı bir güvenlik operasyon platformudur.
 
-## Tamamlanan production checkpoint
+Üretim hazırlığı yalnızca kodun derlenmesiyle tamamlanmaz. Gerçek domain bağlantısı ve devreye alma için [çalıştırma rehberi](docs/OPERATIONS_RUNBOOK.md) esas alınmalıdır. Strix açık testi yapar; trafik koruması için ayrıca Cloudflare gibi bir enforcement sağlayıcısı gerekir. HCSC içindeki SOAR kayıtları tek başına dış sistemde engelleme yapmaz.
+
+## Uygulanan bileşenler
 
 - DB-backed register, session ve organization membership
 - gerçek TOTP 2FA enrollment
 - recovery codes
 - Resend ile password reset mail akışı
-- distributed rate limit (Upstash Redis + safe in-memory fallback)
+- distributed rate limit (Upstash Redis; yalnızca development ortamında bellek fallback, production’da hata durumunda işlem reddi)
 - organization-scoped API ve backend security engines
 - trap endpoint, print payload ve release-safe report flow
 - settings içinde security ve team management yüzeyleri
 - yetkili hedef, koşu ve bulgu yönetimi sunan Adversary Validation alanı
 - resmi Strix API ile yetkili varlık taraması ve bulgu uzlaştırma
 - SSRF korumalı, HMAC imzalı webhook entegrasyonları
-- canlılık, hazır olma ve gerçek bağımlılık sağlık kontrolleri
+- canlılık, veritabanı şeması, hazır olma ve gerçek bağımlılık sağlık kontrolleri
+- DNS TXT sahipliği ve Cloudflare yapılandırma kontrolü ile domain kurulum akışı (`/domains`)
 
 ## Local kurulum
 
@@ -36,10 +39,10 @@ npm run prisma:generate
 5. Şema değişikliklerini uygula:
 
 ```bash
-npm run db:push
+npm run db:migrate:deploy
 ```
 
-6. Başlangıç verisini yükle:
+6. Yalnızca ayrı bir demo veritabanı kullanıyorsan örnek veri yükle. Gerçek müşteri ortamında bu adımı atla:
 
 ```bash
 npm run db:seed
@@ -77,7 +80,7 @@ Notlar:
 - `APP_URL` production’da `https://hcsc.space` olacak şekilde tanımlanmalıdır.
 - Admin console erişimi tekil system owner modelindedir; production’da `SYSTEM_OWNER_EMAIL` veya `SYSTEM_OWNER_USER_ID` tanımlanmalıdır.
 - `RECOVERY_CODE_HASH_KEY` ayrı tanımlanmalı; `SESSION_SECRET` fallback olarak bırakılmamalıdır.
-- `UPSTASH_*` env yoksa local development için in-memory rate limit fallback çalışır. Production’da merkezi Redis tavsiye edilir.
+- `UPSTASH_*` env yoksa local development için in-memory rate limit fallback çalışır. Production’da merkezi Redis zorunludur; erişilemezse giriş ve hassas işlemler reddedilir.
 - `self_hosted` provider için `STRIX_RUNNER_URL`, `STRIX_RUNNER_TOKEN` ve ayrı bir `STRIX_RUNNER_CALLBACK_TOKEN` gerekir; runner Vercel uygulamasından ayrı çalıştırılmalıdır.
 
 ## Adversary Validation güvenlik sınırı

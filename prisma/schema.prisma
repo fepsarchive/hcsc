@@ -308,6 +308,7 @@ model Organization {
   securityTestRuns    SecurityTestRun[]
   securityTestFindings SecurityTestFinding[]
   integrationEndpoints IntegrationEndpoint[]
+  connectedDomains    ConnectedDomain[]
   settings            OrganizationSettings?
   riskPolicy          RiskPolicy?
   reportBranding      ReportBranding?
@@ -847,6 +848,26 @@ model IntegrationEndpoint {
 
   @@unique([organizationId, endpointUrl])
   @@index([organizationId, isEnabled])
+}
+
+model ConnectedDomain {
+  id              String   @id @default(cuid())
+  organizationId  String
+  hostname        String
+  verificationToken String
+  verifiedAt      DateTime?
+  activatedAt     DateTime?
+  lastCheckedAt   DateTime?
+  status          String   @default("pending_verification")
+  zoneId          String?
+  tokenCiphertext String?
+  lastCheck       Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  @@unique([organizationId, hostname])
+  @@index([organizationId, status])
 }
 
 model RiskPolicy {

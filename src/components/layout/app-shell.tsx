@@ -15,6 +15,7 @@ import {
 import { useSecurityConsoleStore } from "@/store/security-console-store"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher"
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -128,6 +129,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarInset className="h-svh min-h-svh overflow-hidden">
           <ToastStack />
           <SiteHeader />
+          <WorkspaceSwitcher />
           {isHydrating || apiError ? (
             <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--text-secondary)]">
               {isHydrating
@@ -139,8 +141,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ref={contentScrollRef}
             className="hcsc-scrollbar min-h-0 min-w-0 flex flex-1 flex-col overflow-y-auto overflow-x-hidden"
           >
-            <div className="@container/main flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-3 py-3 lg:px-4 lg:py-4">
-              {children}
+            <div className="@container/main flex min-w-0 grow shrink-0 flex-col gap-3 px-3 py-3 lg:px-4 lg:py-4">
+              {!isApiMode ? (
+                <div role="status" className="rounded-xl border p-5">
+                  {apiError ? "Canlı veriler yüklenemedi. Bağlantıyı kontrol edip sayfayı yenile." : "Canlı çalışma alanı yükleniyor..."}
+                </div>
+              ) : children}
             </div>
           </div>
         </SidebarInset>

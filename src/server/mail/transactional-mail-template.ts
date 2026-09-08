@@ -34,7 +34,7 @@ export function renderTransactionalMail(content: TransactionalMailContent) {
   };
 
   const text = [
-    safe.greeting,
+    content.greeting,
     "",
     ...content.paragraphs.flatMap((paragraph) => [paragraph, ""]),
     `${content.action.label}:`,

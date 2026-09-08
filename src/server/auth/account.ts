@@ -744,6 +744,7 @@ export async function completeWorkspaceOnboarding(input: {
       cloudMode: input.data.cloudMode,
       complianceFrameworks: input.data.complianceFrameworks,
       onboardingCompleted: true,
+      demoMode: input.data.seedStarterData,
       updatedAt: new Date(),
     },
   });
@@ -786,7 +787,7 @@ export async function completeWorkspaceOnboarding(input: {
     await recalculateAndPersistCompliance({
       organizationId: input.organizationId,
       actor: input.actor,
-    }).catch(() => null);
+    });
 
     const assetCount = await prisma.asset.count({
       where: { organizationId: input.organizationId },
@@ -797,7 +798,7 @@ export async function completeWorkspaceOnboarding(input: {
         organizationId: input.organizationId,
         type: "security_posture",
         actor: input.actor,
-      }).catch(() => null);
+      });
     }
   }
 

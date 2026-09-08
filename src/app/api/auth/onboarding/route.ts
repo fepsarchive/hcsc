@@ -20,6 +20,7 @@ const onboardingSchema = z.object({
 export async function POST(request: NextRequest) {
   const auth = await requireApiAuth(request, {
     requireTwoFactor: true,
+    permission: "manage_settings",
     target: "auth:onboarding",
   });
 

@@ -36,6 +36,8 @@ export async function probeDatabase(): Promise<DependencyProbe> {
   const startedAt = Date.now();
   try {
     await prisma.$queryRaw`SELECT 1`;
+    await prisma.$queryRaw`SELECT "id", "tokenCiphertext", "lastCheck" FROM "ConnectedDomain" LIMIT 0`;
+    await prisma.$queryRaw`SELECT "id", "signingSecretCiphertext" FROM "IntegrationEndpoint" LIMIT 0`;
     return { status: "healthy", latencyMs: elapsed(startedAt), message: "Database query completed." };
   } catch {
     return { status: "unavailable", latencyMs: elapsed(startedAt), message: "Database query failed." };
@@ -58,10 +60,12 @@ export async function probeCache(): Promise<DependencyProbe> {
       cache: "no-store",
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
+    const payload: unknown = await response.json();
+    const healthy = response.ok && Array.isArray(payload) && payload[0]?.result === "PONG" && !payload[0]?.error;
     return {
-      status: response.ok ? "healthy" : "degraded",
+      status: healthy ? "healthy" : "degraded",
       latencyMs: elapsed(startedAt),
-      message: response.ok ? "Remote rate-limit cache responded." : `Cache probe returned ${response.status}.`,
+      message: healthy ? "Remote rate-limit cache responded with PONG." : `Cache probe failed (HTTP ${response.status}).`,
     };
   } catch {
     return { status: "unavailable", latencyMs: elapsed(startedAt), message: "Remote rate-limit cache did not respond." };
@@ -84,7 +88,7 @@ export async function probeMailProvider(): Promise<DependencyProbe> {
     return {
       status: response.ok ? "healthy" : "degraded",
       latencyMs: elapsed(startedAt),
-      message: response.ok ? "Email provider API responded." : `Email provider returned ${response.status}.`,
+      message: response.ok ? "Email provider API responded; delivery is not verified by this read-only probe." : response.status === 403 ? "Token cannot list domains (possibly send-only); actual delivery remains unverified." : `Email provider returned ${response.status}.`,
     };
   } catch {
     return { status: "unavailable", latencyMs: elapsed(startedAt), message: "Email provider API did not respond." };

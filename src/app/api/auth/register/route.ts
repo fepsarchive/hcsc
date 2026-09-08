@@ -5,6 +5,7 @@ import { registerWorkspaceAccount } from "@/server/auth/account";
 import { apiCreated, apiError } from "@/server/api/response";
 import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { buildRequestMeta, setSessionCookie } from "@/server/auth/session";
+import { getApplicationPolicy } from "@/server/auth/application-policy";
 
 const registerSchema = z.object({
   fullName: z.string().trim().min(2),
@@ -15,6 +16,10 @@ const registerSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const meta = buildRequestMeta(request);
+  const policy = await getApplicationPolicy();
+  if (policy.maintenanceMode || !policy.registrationEnabled) {
+    return apiError(meta.requestId, 503, "REGISTRATION_DISABLED", "Yeni kayıtlar geçici olarak kapalı.");
+  }
   const json = await request.json().catch(() => null);
   const parsed = registerSchema.safeParse(json);
 

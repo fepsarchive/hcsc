@@ -36,8 +36,8 @@ export default function OnboardingPage() {
   const [usageType, setUsageType] = useState<(typeof usageOptions)[number]["value"]>("saas");
   const [defaultCurrency, setDefaultCurrency] = useState<(typeof currencyOptions)[number]>("TRY");
   const [frameworks, setFrameworks] = useState<string[]>(currentOrganization.complianceFrameworks);
-  const [seedDemoData, setSeedDemoData] = useState(true);
-  const [runInitialScan, setRunInitialScan] = useState(true);
+  const [seedDemoData, setSeedDemoData] = useState(false);
+  const [runInitialScan, setRunInitialScan] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,7 +114,7 @@ export default function OnboardingPage() {
               runInitialScan,
             }).then((success) => {
               setIsSubmitting(false);
-              if (success) router.replace("/dashboard");
+              if (success) router.replace(seedDemoData ? "/dashboard" : "/domains");
             });
           }}
         >
@@ -179,7 +179,7 @@ export default function OnboardingPage() {
               </label>
               <label className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-3">
                 <Checkbox checked={runInitialScan} onCheckedChange={(checked) => setRunInitialScan(Boolean(checked))} />
-                <div><p className="text-sm font-medium text-[var(--text-primary)]">İlk güvenlik taraması</p><p className="text-xs text-[var(--text-muted)]">Risk ve uyumluluk kartları ilk girişte hazırlanır.</p></div>
+                <div><p className="text-sm font-medium text-[var(--text-primary)]">Mevcut verilerden uyumluluk hesabı</p><p className="text-xs text-[var(--text-muted)]">Dış site taraması değildir. Gerçek açık testi domain bağlantısından sonra ayrıca başlatılır.</p></div>
               </label>
               <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-3">
                 <div className="flex items-start gap-3">

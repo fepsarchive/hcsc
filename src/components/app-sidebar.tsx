@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils"
 
 const workspaceItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
+  { title: "Domain Bağlantıları", href: "/domains", icon: ShieldCheckIcon },
   { title: "Cloud Map", href: "/cloud-map", icon: NetworkIcon },
   { title: "Data Assets", href: "/data-assets", icon: DatabaseIcon },
   { title: "Access Requests", href: "/access-requests", icon: ShieldCheckIcon },
@@ -180,7 +181,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <div className="group-data-[collapsible=icon]:hidden rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-sidebar-foreground/80">Security Score</span>
-            <Badge variant="outline">{dashboard.securityScore}/100</Badge>
+            <Badge variant="outline">{environment.assets.length ? `${dashboard.securityScore}/100` : "Ölçüm yok"}</Badge>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div className="rounded-lg border border-sidebar-border bg-background/70 px-2 py-1.5">
@@ -194,7 +195,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
           <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Workspace</span>
-            <span>Live</span>
+            <span>{currentOrganization.demoMode ? "Demo verileri" : "API bağlantısı"}</span>
           </div>
         </div>
       </SidebarFooter>

@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
 
 import { evaluateRuntimeReadiness } from "@/lib/runtime-readiness";
-import { probeDatabase } from "@/server/health/dependency-health";
+import { probeCache, probeDatabase } from "@/server/health/dependency-health";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [database, configuration] = await Promise.all([
+  const [database, configuration, cache] = await Promise.all([
     probeDatabase(),
     Promise.resolve(evaluateRuntimeReadiness(process.env)),
+    process.env.NODE_ENV === "production" ? probeCache() : Promise.resolve(null),
   ]);
-  const ready = database.status === "healthy" && configuration.ready;
+  const ready = database.status === "healthy" && configuration.ready && (!cache || cache.status === "healthy");
 
   return NextResponse.json(
     {
       status: ready ? "ready" : "not_ready",
       checks: {
+        cache: cache ? { status: cache.status, latencyMs: cache.latencyMs } : { status: "not_required_in_development" },
         database: {
           status: database.status,
           latencyMs: database.latencyMs,

@@ -168,7 +168,7 @@ async function getFindings(prisma: PrismaClient): Promise<Finding[]> {
       status: target.envConfigured ? "ok" : "warning",
       detail: target.envConfigured
         ? "SYSTEM_OWNER_EMAIL or SYSTEM_OWNER_USER_ID configured"
-        : "env missing; app will use fallback security.admin@hcsc.local",
+        : "Owner env missing: development fallback only; production owner access is disabled.",
     },
   ];
 
@@ -386,7 +386,9 @@ async function main() {
 
   try {
     if (mode === "check") {
-      formatFindings(await getFindings(prisma));
+      const findings = await getFindings(prisma);
+      formatFindings(findings);
+      if (findings.some((finding) => finding.status === "missing" || finding.status === "needs_fix")) process.exitCode = 1;
       return;
     }
 

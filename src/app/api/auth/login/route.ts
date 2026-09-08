@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     device: meta.userAgent,
   });
 
-  if (!user || !verifyPassword(parsed.data.password, user.passwordHash) || !user.memberships[0]) {
+  if (!user || user.status !== "active" || !verifyPassword(parsed.data.password, user.passwordHash) || !user.memberships[0]) {
     await createAuthAuditLog({
       organizationId,
       userId: user?.id ?? null,
@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
   }
 
   const membership = user.memberships[0];
+  user.role = membership.role;
   const testAuthBypass = isTestAuthBypassAllowed({
     nodeEnv: process.env.NODE_ENV,
     enabled: process.env.HCSC_TEST_AUTH_BYPASS_ENABLED,

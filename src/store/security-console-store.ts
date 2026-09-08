@@ -259,7 +259,13 @@ export type SecurityConsoleStore = {
 };
 
 const AUTH_SESSION_KEY = "hcsc-auth-session";
-const ALLOW_LOCAL_AUTH_FALLBACK = process.env.NODE_ENV !== "production";
+const ALLOW_LOCAL_AUTH_FALLBACK = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_HCSC_DEMO_ENABLED === "true";
+
+function allowDemoFallback() {
+  if (ALLOW_LOCAL_AUTH_FALLBACK && currentMeta.demoMode && !currentMeta.isApiMode) return true;
+  pushToast({ title: "İşlem kaydedilemedi", description: "API işlemi başarısız. Yerel veri başarı olarak gösterilmedi; bağlantıyı kontrol edip tekrar dene.", tone: "warning" });
+  return false;
+}
 
 const listeners = new Set<() => void>();
 let authHydrationPromise: Promise<void> | null = null;
@@ -1067,6 +1073,7 @@ const actions: Pick<
   | "updateOrganizationSettings"
 > = {
   runSimulation(scenarioId) {
+    if (!allowDemoFallback()) return;
     pushAuditLog({
       action: "simulation_started",
       module: "Simulations",
@@ -1287,7 +1294,7 @@ const actions: Pick<
 
       return;
     } catch {
-      // API unavailable, continue with local deterministic fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("accessRequest", false);
     }
@@ -1410,7 +1417,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("accessRequest", false);
     }
@@ -1440,6 +1447,7 @@ const actions: Pick<
   },
 
   updateAccessRequestDecision(requestId, decision) {
+    if (!allowDemoFallback()) return;
     const requests = currentEnvironment.accessRequests.map((request) =>
       request.id === requestId
         ? {
@@ -1477,7 +1485,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("events", false);
     }
@@ -1503,7 +1511,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("playbook", false);
     }
@@ -1567,7 +1575,7 @@ const actions: Pick<
         return;
       }
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("deception", false);
     }
@@ -1654,7 +1662,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("assetRisk", false);
     }
@@ -1696,7 +1704,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("assetRisk", false);
     }
@@ -1730,7 +1738,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("report", false);
     }
@@ -1784,7 +1792,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("compliance", false);
     }
@@ -1840,6 +1848,7 @@ const actions: Pick<
   },
 
   togglePolicyRule(ruleId) {
+    if (!allowDemoFallback()) return;
     setEnvironment({
       ...currentEnvironment,
       policyRules: currentEnvironment.policyRules.map((rule) =>
@@ -1849,6 +1858,7 @@ const actions: Pick<
   },
 
   addPolicyRule(rule) {
+    if (!allowDemoFallback()) return;
     setEnvironment({
       ...currentEnvironment,
       policyRules: [
@@ -1894,7 +1904,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("deception", false);
     }
@@ -1937,6 +1947,10 @@ const actions: Pick<
   },
 
   startDemoScenario() {
+    if (!ALLOW_LOCAL_AUTH_FALLBACK || currentMeta.isApiMode) {
+      pushToast({ title: "Demo kapalı", description: "Canlı çalışma alanı örnek verilerle değiştirilemez.", tone: "warning" });
+      return;
+    }
     const fresh = createMockEnvironment();
     setEnvironment(
       {
@@ -1961,6 +1975,7 @@ const actions: Pick<
   },
 
   nextDemoStep() {
+    if (!allowDemoFallback()) return;
     const nextStep = Math.min(
       currentEnvironment.demoScenario.currentStep + 1,
       currentEnvironment.demoScenario.steps.length - 1,
@@ -1969,6 +1984,7 @@ const actions: Pick<
   },
 
   previousDemoStep() {
+    if (!allowDemoFallback()) return;
     const target = Math.max(currentEnvironment.demoScenario.currentStep - 1, 0);
     setEnvironment(
       {
@@ -2687,7 +2703,7 @@ const actions: Pick<
       await hydrateEnvironmentFromApi({ silent: true });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("notifications", false);
     }
@@ -2710,7 +2726,7 @@ const actions: Pick<
       });
       return;
     } catch {
-      // API unavailable, continue with local fallback.
+      if (!allowDemoFallback()) return;
     } finally {
       setOperationLoading("notifications", false);
     }

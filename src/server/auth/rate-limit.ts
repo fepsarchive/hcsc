@@ -15,6 +15,7 @@ type RateLimitWindow = {
 };
 
 type RateLimitPolicyName =
+  | "domain_check"
   | "login"
   | "register"
   | "forgot_password"
@@ -56,6 +57,7 @@ type UpstashPipelineResponse = Array<{
 const rateLimitStore = new Map<string, RateLimitStoreEntry>();
 const UPSTASH_TIMEOUT_MS = 2000;
 const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitWindow[]> = {
+  domain_check: [{ name: "user", scope: "user", limit: 12, windowMs: 60_000 }],
   login: [
     { name: "email_ip", scope: "email_ip", limit: 5, windowMs: 1000 * 60 * 5 },
     { name: "ip", scope: "ip", limit: 20, windowMs: 1000 * 60 * 10 },
@@ -330,6 +332,7 @@ async function consumeDistributedRateLimit(input: ConsumeRateLimitInput, policyN
 
   if (!shouldUseUpstash()) {
     logMissingUpstashWarning();
+    if (process.env.NODE_ENV === "production") return unavailableRateLimit(input);
     return consumeMemoryRateLimit(input);
   }
 
@@ -337,8 +340,13 @@ async function consumeDistributedRateLimit(input: ConsumeRateLimitInput, policyN
     return await consumeUpstashRateLimit(input);
   } catch (error) {
     logUpstashFailure(error instanceof Error ? error.message : "unknown_upstash_error", policyName);
+    if (process.env.NODE_ENV === "production") return unavailableRateLimit(input);
     return consumeMemoryRateLimit(input);
   }
+}
+
+function unavailableRateLimit(input: ConsumeRateLimitInput): RateLimitDecision {
+  return { allowed: false, limit: input.limit, remaining: 0, resetAt: now() + 60_000, retryAfterSeconds: 60, source: "upstash", scope: input.key };
 }
 
 export function createRateLimitTokenFingerprint(token: string) {

@@ -62,13 +62,17 @@ async function sendTransactionalMail(input: {
 
   try {
     const body = renderTransactionalMail(input.content);
-    await new Resend(config.apiKey).emails.send({
+    const result = await new Resend(config.apiKey).emails.send({
       from: config.from,
       to: input.to,
       subject: input.subject,
       html: body.html,
       text: body.text,
     });
+    if (result.error || !result.data?.id) {
+      console.error("[mail] provider rejected delivery", { kind: input.kind, recipient, code: result.error?.name ?? "missing_message_id" });
+      return { success: false, reason: "delivery-failed" };
+    }
     console.info("[mail] transactional email sent", { kind: input.kind, recipient, provider: "resend", env: process.env.NODE_ENV });
     return { success: true };
   } catch (error) {

@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 
 import { requireApiAuth } from "@/server/api/require-auth";
-import { apiOk } from "@/server/api/response";
+import { apiError, apiOk } from "@/server/api/response";
 import { runExecutiveDemo } from "@/server/services/simulations/simulations-service";
 
 export async function POST(request: NextRequest) {
@@ -24,6 +24,8 @@ export async function POST(request: NextRequest) {
       userAgent: auth.context.userAgent,
     },
   });
+
+  if (!result) return apiError(auth.context.requestId, 409, "SIMULATION_DATA_REQUIRED", "Bu senaryo için örnek varlıklar eksik; gerçek siteyi bağlamak için Domain Bağlantıları alanını kullan.");
 
   return apiOk(auth.context.requestId, result);
 }

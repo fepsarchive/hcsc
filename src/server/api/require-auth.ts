@@ -4,6 +4,8 @@ import { apiError } from "@/server/api/response";
 import { getPermissionsForRole, hasServerPermission, mapDbUserToAppUser, mapOrganizationToProfile, recordUnauthorizedAction } from "@/server/auth/permissions";
 import { buildRequestMeta, getSessionContext, getSessionTokenFromRequest } from "@/server/auth/session";
 import type { Permission } from "@/types";
+import { getApplicationPolicy } from "@/server/auth/application-policy";
+import { isSystemOwner } from "@/server/auth/system-owner";
 
 export async function requireApiAuth(
   request: NextRequest,
@@ -28,6 +30,10 @@ export async function requireApiAuth(
       ok: false as const,
       response: apiError(meta.requestId, 403, "TWO_FACTOR_REQUIRED", "Bu işlem için 2FA doğrulaması gerekli."),
     };
+  }
+
+  if (!isSystemOwner(session.user) && (await getApplicationPolicy()).maintenanceMode) {
+    return { ok: false as const, response: apiError(meta.requestId, 503, "MAINTENANCE_MODE", "Sistem bakımda. Lütfen daha sonra tekrar dene.") };
   }
 
   if (options.permission && !hasServerPermission(session.user.role, options.permission)) {

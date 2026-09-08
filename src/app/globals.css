@@ -207,6 +207,20 @@ body {
   color: var(--foreground);
 }
 
+/* Radix positions body portals in viewport pixels. Cancel body zoom only on
+ * the positioning wrapper, then restore product density on the visible menu.
+ * Otherwise fixed coordinates are scaled twice and drift away from triggers.
+ */
+@media screen {
+  body > [data-radix-popper-content-wrapper] {
+    zoom: calc(1 / var(--hcsc-ui-scale));
+  }
+
+  body > [data-radix-popper-content-wrapper] > * {
+    zoom: var(--hcsc-ui-scale);
+  }
+}
+
 /*
  * Keep the entire product at the same density as browser zoom 90% while the
  * browser itself stays at 100%. Viewport utilities are compensated so every
@@ -373,17 +387,6 @@ select {
 
   .auth-shell-card .h-11 {
     height: 2.375rem;
-  }
-
-  .auth-compact-hide {
-    display: none !important;
-  }
-
-  .auth-compact-copy {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
   }
 
   .auth-qr-frame {

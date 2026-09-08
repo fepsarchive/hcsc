@@ -78,9 +78,8 @@ export function DashboardView() {
     return (
       <EmptyState
         title="İlk güvenlik görünümün hazır olduğunda dashboard burada canlanacak"
-        description="Başlangıç verilerini yükleyebilir, rehberli çalıştırma başlatabilir veya onboarding sonrası ilk taramayı başlatarak kartları doldurabilirsin."
-        primaryAction={<ActionButton onClick={() => void runExecutiveDemo()}>Guided Run Başlat</ActionButton>}
-        secondaryAction={<ActionButton variant="secondary" onClick={startDemoScenario}>Operasyon Akışını Başlat</ActionButton>}
+        description="Önce domainini bağla ve sahipliğini doğrula. Trafik koruması için sağlayıcı bağlantısını, açık testi için Strix yetkilendirmesini tamamla."
+        primaryAction={<Link href="/domains" className="rounded-xl border px-4 py-2">Domainimi bağla</Link>}
       />
     );
   }

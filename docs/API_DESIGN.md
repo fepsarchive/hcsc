@@ -1,5 +1,7 @@
 # HCSC v2 API Design
 
+> Tarihsel tasarım önerisi: aşağıdaki liste uygulanmış endpoint envanteri değildir. Güncel rotaları `npm run api:inventory` ile üret; işletim ve gerçek domain akışı için [çalıştırma rehberini](OPERATIONS_RUNBOOK.md) kullan. Uygulanan yeni rotalar: `/api/domains` (GET/POST), `/api/domains/[id]` (POST verify/check/connect/activate), `/api/auth/workspaces` (GET/POST). Tümü oturum, 2FA ve tenant kapsamını denetler; domain yönetimi `manage_settings` ister.
+
 ## Amaç
 
 Bu belge, HCSC v2 için önerilen API yüzeyini tanımlar.

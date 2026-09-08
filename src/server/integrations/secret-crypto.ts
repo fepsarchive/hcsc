@@ -3,7 +3,7 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 function encryptionKey() {
-  const source = process.env.INTEGRATION_ENCRYPTION_KEY?.trim() || process.env.SESSION_SECRET?.trim();
+  const source = process.env.INTEGRATION_ENCRYPTION_KEY?.trim() || (process.env.NODE_ENV !== "production" ? process.env.SESSION_SECRET?.trim() : undefined);
   if (!source) throw new Error("Integration encryption key is not configured.");
   return createHash("sha256").update(source).digest();
 }

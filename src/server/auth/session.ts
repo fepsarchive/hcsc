@@ -94,12 +94,12 @@ export async function createVerifiedSession(input: {
   return { rawToken, session };
 }
 
-export async function getSessionContext(rawToken: string | null) {
+export async function getSessionContext(rawToken: string | null, client: Pick<typeof prisma, "session" | "membership"> = prisma) {
   if (!rawToken) {
     return null;
   }
 
-  const session = await prisma.session.findUnique({
+  const session = await client.session.findUnique({
     where: {
       tokenHash: hashToken(rawToken),
     },
@@ -127,8 +127,8 @@ export async function getSessionContext(rawToken: string | null) {
   }
 
   if (session.status === "revoked" || session.status === "expired" || session.expiresAt.getTime() <= Date.now()) {
-    if (session.status !== "expired") {
-      await prisma.session.update({
+    if (session.status !== "expired" && session.status !== "revoked") {
+      await client.session.update({
         where: { id: session.id },
         data: { status: "expired" },
       });
@@ -137,12 +137,21 @@ export async function getSessionContext(rawToken: string | null) {
     return null;
   }
 
-  await prisma.session.update({
+  const membership = await client.membership.findFirst({
+    where: { userId: session.userId, organizationId: session.organizationId },
+  });
+  if (session.user.status !== "active" || !membership) {
+    await client.session.update({ where: { id: session.id }, data: { status: "revoked" } });
+    return null;
+  }
+
+  await client.session.update({
     where: { id: session.id },
     data: { lastSeenAt: new Date() },
   });
 
-  return session;
+  // Tenant permissions must never inherit a role from another workspace.
+  return { ...session, user: { ...session.user, role: membership.role }, membership };
 }
 
 export async function markSessionTwoFactorVerified(sessionId: string) {

@@ -366,6 +366,10 @@ export async function updateTeamMemberRole(input: {
   }
 
   const updated = await prisma.$transaction(async (transaction) => {
+    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.organizationId}))`;
+    const current = await transaction.membership.findUnique({ where: { id: membership.id } });
+    const admins = await transaction.membership.count({ where: { organizationId: input.organizationId, role: "security_admin" } });
+    if (!current || (current.role === "security_admin" && input.nextRole !== "security_admin" && admins <= 1)) return null;
     const nextMembership = await transaction.membership.update({
       where: {
         id: membership.id,
@@ -378,17 +382,10 @@ export async function updateTeamMemberRole(input: {
       },
     });
 
-    await transaction.user.update({
-      where: {
-        id: membership.userId,
-      },
-      data: {
-        role: input.nextRole,
-      },
-    });
-
     return nextMembership;
   });
+
+  if (!updated) return { success: false as const, code: "LAST_ADMIN_PROTECTED", message: "Üyelik değişti veya son yönetici korunuyor. Listeyi yenile." };
 
   await createAuthAuditLog({
     organizationId: input.organizationId,
@@ -443,7 +440,11 @@ export async function removeTeamMember(input: {
     };
   }
 
-  await prisma.$transaction(async (transaction) => {
+  const removed = await prisma.$transaction(async (transaction) => {
+    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.organizationId}))`;
+    const current = await transaction.membership.findUnique({ where: { id: membership.id } });
+    const admins = await transaction.membership.count({ where: { organizationId: input.organizationId, role: "security_admin" } });
+    if (!current || (current.role === "security_admin" && admins <= 1)) return false;
     await transaction.membership.delete({
       where: {
         id: membership.id,
@@ -479,7 +480,10 @@ export async function removeTeamMember(input: {
         },
       });
     }
+    return true;
   });
+
+  if (!removed) return { success: false as const, code: "LAST_ADMIN_PROTECTED", message: "Üyelik değişti veya son yönetici korunuyor. Listeyi yenile." };
 
   await createAuthAuditLog({
     organizationId: input.organizationId,
@@ -561,15 +565,6 @@ export async function acceptTeamInvite(input: {
       },
     });
 
-    await transaction.user.update({
-      where: {
-        id: input.currentUserId,
-      },
-      data: {
-        role: invite.role,
-        status: "active",
-      },
-    });
   });
 
   await createAuthAuditLog({
