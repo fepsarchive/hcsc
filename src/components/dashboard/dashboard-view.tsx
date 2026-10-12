@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { GuidedRunPanel } from "./guided-run-panel";
+import { useGuidedRun } from "./use-guided-run";
 import {
   DataTable,
   DataTableBody,
@@ -26,21 +28,15 @@ import {
   classificationLabel,
   formatDateTime,
   locationLabel,
-  requestStatusTone,
 } from "@/lib/utils";
 import { useSecurityConsoleStore } from "@/store/security-console-store";
 
 export function DashboardView() {
   const dashboard = useSecurityConsoleStore((state) => state.dashboard);
   const environment = useSecurityConsoleStore((state) => state.environment);
-  const nextDemoStep = useSecurityConsoleStore((state) => state.nextDemoStep);
-  const previousDemoStep = useSecurityConsoleStore((state) => state.previousDemoStep);
-  const startDemoScenario = useSecurityConsoleStore((state) => state.startDemoScenario);
-  const runExecutiveDemo = useSecurityConsoleStore((state) => state.runExecutiveDemo);
-  const lastSimulationResult = useSecurityConsoleStore((state) => state.lastSimulationResult);
+  const guide = useGuidedRun();
   const isHydrating = useSecurityConsoleStore((state) => state.isHydrating);
 
-  const currentDemoStep = environment.demoScenario.steps[environment.demoScenario.currentStep];
   const pendingRequests = environment.accessRequests.filter((request) => request.status === "pending").length;
   const highRiskAssets = environment.assets.filter(
     (asset) => !asset.isDeception && ["high", "critical"].includes(asset.risk.level),
@@ -76,11 +72,14 @@ export function DashboardView() {
 
   if (!hasOperationalData) {
     return (
+      <div className="space-y-4">
+      <GuidedRunPanel />
       <EmptyState
         title="İlk güvenlik görünümün hazır olduğunda dashboard burada canlanacak"
         description="Önce domainini bağla ve sahipliğini doğrula. Trafik koruması için sağlayıcı bağlantısını, açık testi için Strix yetkilendirmesini tamamla."
         primaryAction={<Link href="/domains" className="rounded-xl border px-4 py-2">Domainimi bağla</Link>}
       />
+      </div>
     );
   }
 
@@ -92,15 +91,7 @@ export function DashboardView() {
           title="Hibrit bulut güvenlik durumu"
           description="Güvenlik skoru, olay yoğunluğu, yüksek riskli veri varlıkları ve operasyon akışı tek görünümde sunulur."
           actions={
-            <>
-              <ActionButton variant="secondary" onClick={previousDemoStep}>
-                Geri
-              </ActionButton>
-              <ActionButton variant="secondary" onClick={nextDemoStep}>
-                İleri
-              </ActionButton>
-              <ActionButton onClick={() => void runExecutiveDemo()}>Guided Run Başlat</ActionButton>
-            </>
+            <ActionButton onClick={() => guide.dispatch("open")}>Guided Run Aç</ActionButton>
           }
         />
       </div>
@@ -222,7 +213,7 @@ export function DashboardView() {
         </Panel>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.96fr,1.04fr]">
+      <div className={`grid gap-4 ${guide.visible ? "xl:grid-cols-[0.96fr,1.04fr]" : ""}`}>
         <Panel className="overflow-hidden rounded-[14px] p-0">
           <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3 lg:px-5">
             <div>
@@ -262,82 +253,7 @@ export function DashboardView() {
           </div>
         </Panel>
 
-        <Panel className="overflow-hidden rounded-[14px] p-0">
-          <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3 lg:px-5">
-            <div>
-              <h2 className="text-base font-semibold text-[var(--text-primary)]">Operasyon Senaryo Akışı</h2>
-              <p className="text-sm text-[var(--text-muted)]">Access Request → Zero Trust → SIEM → Deception → Report</p>
-            </div>
-            <StatusBadge
-              label={environment.demoScenario.active ? "aktif akış" : "hazır"}
-              tone={environment.demoScenario.active ? "deception" : "info"}
-            />
-          </div>
-
-          <div className="grid gap-0 lg:grid-cols-[1.1fr,0.9fr]">
-            <div className="border-b border-[var(--border)] px-4 py-4 lg:border-b-0 lg:border-r lg:border-[var(--border)] lg:px-5">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <StatusBadge label={`Adım ${environment.demoScenario.currentStep + 1}`} tone="policy" />
-                  <StatusBadge
-                    label={currentDemoStep?.status ?? "pending"}
-                    tone={requestStatusTone(
-                      currentDemoStep?.status === "completed"
-                        ? "approved"
-                        : currentDemoStep?.status === "active"
-                          ? "pending"
-                          : "step_up",
-                    )}
-                  />
-                </div>
-                <h3 className="text-balance text-lg font-semibold text-[var(--text-primary)]">{currentDemoStep?.title}</h3>
-                <p className="text-pretty text-sm leading-6 text-[var(--text-secondary)]">{currentDemoStep?.description}</p>
-              </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ActionButton variant="secondary" onClick={previousDemoStep}>
-                Geri
-                </ActionButton>
-                <ActionButton variant="secondary" onClick={nextDemoStep}>
-                  İleri
-                </ActionButton>
-                <ActionButton onClick={startDemoScenario}>Akışı Baştan Başlat</ActionButton>
-              </div>
-
-              {lastSimulationResult ? (
-                <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-3">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Son çalıştırma etkisi</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{lastSimulationResult.summary}</p>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="divide-y divide-[var(--border)]">
-              {environment.demoScenario.steps.map((step, index) => (
-                <div key={step.id} className="px-4 py-3 lg:px-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--text-primary)]">
-                        {index + 1}. {step.title}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{step.description}</p>
-                    </div>
-                    <StatusBadge
-                      label={step.status}
-                      tone={
-                        step.status === "completed"
-                          ? "low"
-                          : step.status === "active"
-                            ? "policy"
-                            : "neutral"
-                      }
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Panel>
+        <GuidedRunPanel />
       </div>
     </div>
   );

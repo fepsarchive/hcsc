@@ -13,7 +13,6 @@ const labels: Record<string, string> = {
   compliance: "Uyumluluk",
   "threat-matrix": "Threat Matrix",
   simulations: "Senaryolar",
-  "cloud-map": "Cloud Map",
   reports: "Raporlar",
   presentation: "Executive Briefing",
   "final-checklist": "Platform Status",

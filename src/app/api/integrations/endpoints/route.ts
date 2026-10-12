@@ -5,6 +5,7 @@ import { requireApiAuth } from "@/server/api/require-auth";
 import { apiCreated, apiError, apiOk } from "@/server/api/response";
 import { parseRequestJson } from "@/server/api/validation";
 import { createIntegrationEndpoint, listIntegrationEndpoints } from "@/server/integrations/integration-endpoint-service";
+import { OutboundPolicyError } from "@/server/integrations/outbound-url-policy";
 
 const createSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -26,8 +27,9 @@ export async function POST(request: NextRequest) {
   try {
     return apiCreated(auth.context.requestId, await createIntegrationEndpoint({ organizationId: auth.context.session.organizationId, userId: auth.context.session.userId, ...parsed.data }));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Endpoint oluşturulamadı.";
-    const conflict = message.includes("Unique constraint");
-    return apiError(auth.context.requestId, conflict ? 409 : 400, conflict ? "ENDPOINT_EXISTS" : "ENDPOINT_REJECTED", message);
+    const conflict = error !== null && typeof error === "object" && "code" in error && error.code === "P2002";
+    if (conflict) return apiError(auth.context.requestId, 409, "ENDPOINT_EXISTS", "Bu endpoint zaten kayıtlı.");
+    if (error instanceof OutboundPolicyError) return apiError(auth.context.requestId, 400, "ENDPOINT_REJECTED", error.message);
+    return apiError(auth.context.requestId, 500, "ENDPOINT_CREATE_FAILED", "Endpoint oluşturulamadı. Sunucu yapılandırmasını kontrol edin.");
   }
 }

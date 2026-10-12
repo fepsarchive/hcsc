@@ -21,11 +21,6 @@ const pageMeta: Record<string, { title: string; description: string; primaryActi
     description: "Genel güvenlik, risk ve operasyon akışı görünümü",
     primaryAction: "Yeni görünüm",
   },
-  "/cloud-map": {
-    title: "Cloud Map",
-    description: "Hibrit bulut mimarisi ve ilişkiler",
-    primaryAction: "Yeni node",
-  },
   "/data-assets": {
     title: "Data Assets",
     description: "Veri varlıkları, sınıflandırma ve risk kayıtları",
@@ -87,7 +82,6 @@ const quickTargets = [
   { href: "/presentation", label: "Executive Briefing" },
   { href: "/reports", label: "Reports" },
   { href: "/simulations", label: "Scenarios" },
-  { href: "/cloud-map", label: "Cloud Map" },
   { href: "/events", label: "Events" },
   { href: "/data-assets", label: "Data Assets" },
 ];

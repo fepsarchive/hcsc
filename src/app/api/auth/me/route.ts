@@ -4,6 +4,7 @@ import { getPermissionsForRole, mapDbUserToAppUser, mapOrganizationToProfile } f
 import { buildRequestMeta, getSessionContext, getSessionTokenFromRequest } from "@/server/auth/session";
 import { isSystemOwner } from "@/server/auth/system-owner";
 import { isTwoFactorEnrolled } from "@/server/auth/two-factor";
+import { hasCompletedAuthentication, isPasswordOnlyAdmin } from "@/server/auth/password-only-admin";
 
 export async function GET(request: NextRequest) {
   const meta = buildRequestMeta(request);
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     enrolledAt: session.user.twoFactorSecret?.enrolledAt,
   });
 
-  if (!session.is2FAVerified) {
+  if (!hasCompletedAuthentication(session)) {
     return NextResponse.json({
       data: {
         authenticated: false,
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
   }
 
   const user = mapDbUserToAppUser(session.user);
-  const redirectTo = isSystemOwner(session.user)
+  const redirectTo = isSystemOwner(session.user) || isPasswordOnlyAdmin(session.user)
     ? "/admin"
     : session.organization.onboardingCompleted
       ? "/dashboard"
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
       authenticated: true,
       requiresTwoFactor: false,
       twoFactorVerified: session.is2FAVerified,
+      twoFactorExempt: session.twoFactorExempt,
       sessionStartedAt: session.createdAt.toISOString(),
       user,
       organization: mapOrganizationToProfile(session.organization),

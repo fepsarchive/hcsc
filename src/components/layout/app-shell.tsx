@@ -51,7 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (
       !auth.hydrated ||
       !auth.isAuthenticated ||
-      !auth.is2FAVerified ||
+      (!auth.is2FAVerified && !auth.twoFactorExempt) ||
       !onboardingCompleted ||
       pathname === "/accept-invite" ||
       typeof window === "undefined"
@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pendingInviteToken) {
       router.replace(`/accept-invite?token=${encodeURIComponent(pendingInviteToken)}`)
     }
-  }, [auth.hydrated, auth.isAuthenticated, auth.is2FAVerified, onboardingCompleted, pathname, router])
+  }, [auth.hydrated, auth.isAuthenticated, auth.is2FAVerified, auth.twoFactorExempt, onboardingCompleted, pathname, router])
 
   useEffect(() => {
     if (isPublicRoute || isAdminRoute) return

@@ -9,6 +9,7 @@ import { buildRequestMeta, createAuthAuditLog, createPendingSession, createVerif
 import { isSystemOwner } from "@/server/auth/system-owner";
 import { isTwoFactorEnrolled } from "@/server/auth/two-factor";
 import { prisma } from "@/server/db/prisma";
+import { isConfiguredAdmin, isPasswordOnlyAdmin } from "@/server/auth/password-only-admin";
 
 const loginSchema = z.object({
   email: z.email().trim(),
@@ -133,11 +134,15 @@ export async function POST(request: NextRequest) {
     platformRole: user.platformRole,
     isSystemOwner: isSystemOwner(user),
   });
-  const { rawToken, session } = await (testAuthBypass ? createVerifiedSession : createPendingSession)({
+  const passwordOnlyAdmin = isPasswordOnlyAdmin(user);
+  const authenticationComplete = testAuthBypass || passwordOnlyAdmin;
+  const { rawToken, session } = await (authenticationComplete ? createVerifiedSession : createPendingSession)({
     userId: user.id,
     organizationId: membership.organizationId,
     ipAddress: meta.ipAddress,
     userAgent: meta.userAgent,
+    passwordOnly: passwordOnlyAdmin,
+    expiresAt: isConfiguredAdmin(user) ? new Date(Date.now() + 60 * 60 * 1000) : undefined,
   });
 
   await prisma.user.update({
@@ -150,18 +155,20 @@ export async function POST(request: NextRequest) {
     userId: user.id,
     actorName: user.name,
     actorRole: mapDbUserToAppUser(user).role,
-    action: testAuthBypass ? "test_auth_bypass_used" : "login_success",
+    action: passwordOnlyAdmin ? "password_only_admin_login" : testAuthBypass ? "test_auth_bypass_used" : "login_success",
     target: user.email,
-    severity: "info",
+    severity: passwordOnlyAdmin ? "warning" : "info",
     result: "success",
-    details: testAuthBypass
+    details: passwordOnlyAdmin
+      ? "Operatörün tanımladığı admin istisnasıyla yalnızca parola kullanılarak giriş yapıldı; 2FA doğrulanmadı. Oturum süresi 1 saat."
+      : testAuthBypass
       ? "Development/test analist hesabı parolayla doğrulandı; denetimli 2FA test geçişi kullanıldı."
       : "Kullanıcı parolayla doğrulandı, 2FA bekleniyor.",
     ipAddress: meta.ipAddress,
     device: meta.userAgent,
   });
 
-  const postAuthPath = isSystemOwner(user)
+  const postAuthPath = isSystemOwner(user) || isConfiguredAdmin(user)
     ? "/admin"
     : membership.organization.onboardingCompleted
       ? "/dashboard"
@@ -169,10 +176,11 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({
     data: {
-      requires2FA: !testAuthBypass,
-      requiresTwoFactor: !testAuthBypass,
+      requires2FA: !authenticationComplete,
+      requiresTwoFactor: !authenticationComplete,
       authenticated: true,
       twoFactorVerified: testAuthBypass,
+      twoFactorExempt: passwordOnlyAdmin,
       testSession: testAuthBypass,
       sessionStartedAt: session.createdAt.toISOString(),
       user: mapDbUserToAppUser(user),
@@ -184,13 +192,13 @@ export async function POST(request: NextRequest) {
         enrolledAt: user.twoFactorSecret?.enrolledAt,
       }),
       nextPath: postAuthPath,
-      redirectTo: testAuthBypass ? postAuthPath : "/verify-2fa",
+      redirectTo: authenticationComplete ? postAuthPath : "/verify-2fa",
     },
     meta: { requestId: meta.requestId },
     error: null,
   });
 
-  setSessionCookie(response, rawToken);
+  setSessionCookie(response, rawToken, session.expiresAt);
 
   return applyRateLimitHeaders(response, rateLimit);
 }

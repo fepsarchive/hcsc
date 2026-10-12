@@ -6,6 +6,7 @@ import { buildRequestMeta, getSessionContext, getSessionTokenFromRequest } from 
 import type { Permission } from "@/types";
 import { getApplicationPolicy } from "@/server/auth/application-policy";
 import { isSystemOwner } from "@/server/auth/system-owner";
+import { hasCompletedAuthentication, isConfiguredAdmin } from "@/server/auth/password-only-admin";
 
 export async function requireApiAuth(
   request: NextRequest,
@@ -13,6 +14,7 @@ export async function requireApiAuth(
     permission?: Permission;
     target?: string;
     requireTwoFactor?: boolean;
+    allowTwoFactorExemption?: boolean;
   } = {},
 ) {
   const meta = buildRequestMeta(request);
@@ -25,14 +27,15 @@ export async function requireApiAuth(
     };
   }
 
-  if ((options.requireTwoFactor ?? true) && !session.is2FAVerified) {
+  const authenticationComplete = options.allowTwoFactorExemption === false ? session.is2FAVerified : hasCompletedAuthentication(session);
+  if ((options.requireTwoFactor ?? true) && !authenticationComplete) {
     return {
       ok: false as const,
       response: apiError(meta.requestId, 403, "TWO_FACTOR_REQUIRED", "Bu işlem için 2FA doğrulaması gerekli."),
     };
   }
 
-  if (!isSystemOwner(session.user) && (await getApplicationPolicy()).maintenanceMode) {
+  if (!isSystemOwner(session.user) && !isConfiguredAdmin(session.user) && (await getApplicationPolicy()).maintenanceMode) {
     return { ok: false as const, response: apiError(meta.requestId, 503, "MAINTENANCE_MODE", "Sistem bakımda. Lütfen daha sonra tekrar dene.") };
   }
 

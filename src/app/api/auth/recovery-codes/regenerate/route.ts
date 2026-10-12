@@ -9,6 +9,7 @@ import { createAuthAuditLog } from "@/server/auth/session";
 export async function POST(request: NextRequest) {
   const auth = await requireApiAuth(request, {
     requireTwoFactor: true,
+    allowTwoFactorExemption: false,
     target: "auth:recovery-codes-regenerate",
   });
 

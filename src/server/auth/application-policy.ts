@@ -9,6 +9,6 @@ export async function getApplicationPolicy(client: Pick<typeof prisma, "appSetti
   });
   return {
     maintenanceMode: settings.some((item) => item.key === "maintenanceMode" && item.value === true),
-    registrationEnabled: !settings.some((item) => item.key === "registrationEnabled" && item.value === false),
+    registrationEnabled: false,
   };
 }

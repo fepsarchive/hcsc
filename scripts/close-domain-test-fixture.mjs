@@ -1,10 +1,14 @@
-import "dotenv/config";
+import { loadEnvConfig } from "@next/env";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import pg from "pg";
 
+loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production");
+execFileSync(process.execPath, ["--import", "tsx", fileURLToPath(new URL("./check-database-isolation.ts", import.meta.url)), "--test-data"], { stdio: "inherit" });
 assert.equal(process.env.HCSC_E2E_ALLOW_DATABASE_WRITES, "true");
 const base = process.env.HCSC_E2E_BASE_URL ?? "http://localhost:3001";
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(base).hostname));

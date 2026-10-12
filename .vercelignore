@@ -1,0 +1,8 @@
+.git
+.next
+node_modules
+.env*
+.vercel
+hcsc-logo
+coverage
+*.tsbuildinfo

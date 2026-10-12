@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       onboardingCompleted: updatedSession.organization.onboardingCompleted,
       twoFactorEnrolled: true,
       recoveryCodes: recoveryCodes ?? undefined,
-      nextPath: updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
+      nextPath: mapDbUserToAppUser(updatedSession.user).canAccessAdmin ? "/admin" : updatedSession.organization.onboardingCompleted ? "/dashboard" : "/onboarding",
     }),
     rateLimit,
   );

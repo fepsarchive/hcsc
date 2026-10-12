@@ -39,7 +39,7 @@ function maskEmail(email: string) {
 }
 
 async function sendTransactionalMail(input: {
-  kind: "password_reset" | "team_invite";
+  kind: "password_reset" | "team_invite" | "account_activation";
   to: string;
   subject: string;
   content: TransactionalMailContent;
@@ -99,6 +99,25 @@ export async function sendPasswordResetMail(input: PasswordResetMailInput) {
       action: { label: "Şifreyi yenile", url: input.resetUrl },
       validity: "Bu bağlantı 1 saat boyunca geçerlidir.",
       safetyNote: "Bu isteği sen yapmadıysan e-postayı dikkate alma ve güvenlik ekibinle iletişime geç.",
+    },
+  });
+}
+
+export async function sendAccountActivationMail(input: PasswordResetMailInput & { organizationName: string }) {
+  return sendTransactionalMail({
+    kind: "account_activation",
+    to: input.to,
+    subject: "HCSC hesabınız oluşturuldu — parolanızı belirleyin",
+    content: {
+      title: "Hesabın hazır",
+      greeting: `Merhaba ${input.recipientName?.trim() || ""},`,
+      paragraphs: [
+        `Yöneticin ${input.organizationName} çalışma alanı için hesabını oluşturdu.`,
+        "Aşağıdaki bağlantıyla kendi parolanı belirle. Ardından giriş yaparak iki aşamalı doğrulama kurulumunu tamamla. Yöneticin parolanı göremez.",
+      ],
+      action: { label: "Parolamı belirle", url: input.resetUrl },
+      validity: "Bu tek kullanımlık bağlantı 1 saat geçerlidir. Süresi dolarsa giriş ekranındaki Şifremi unuttum alanından yeni bağlantı isteyebilirsin.",
+      safetyNote: "Bu hesabı beklemiyorsan bağlantıyı kullanma ve yöneticinle iletişime geç. Bağlantıyı veya doğrulama kodlarını kimseyle paylaşma.",
     },
   });
 }

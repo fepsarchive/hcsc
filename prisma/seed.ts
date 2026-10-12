@@ -1,4 +1,5 @@
-import "dotenv/config";
+import { loadEnvConfig } from "@next/env";
+import { assertDatabaseIsolation } from "../src/lib/database-isolation";
 
 import { createHash } from "node:crypto";
 
@@ -215,6 +216,8 @@ const ZeroTrustDecision = {
   isolate: "isolate",
 } as const;
 
+loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production");
+assertDatabaseIsolation(process.env, { testData: true });
 const databaseUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 
 if (!databaseUrl) {

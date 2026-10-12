@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useGuidedRun } from "@/components/dashboard/use-guided-run"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -45,10 +46,6 @@ const pageMeta: Record<string, { title: string; description: string }> = {
   "/dashboard": {
     title: "Dashboard",
     description: "Genel güvenlik, risk ve operasyon görünümü",
-  },
-  "/cloud-map": {
-    title: "Cloud Map",
-    description: "Hibrit bulut mimarisi ve ilişkiler",
   },
   "/data-assets": {
     title: "Data Assets",
@@ -121,7 +118,7 @@ export function SiteHeader() {
   const pathname = usePathname()
   const environment = useSecurityConsoleStore((state) => state.environment)
   const dashboard = useSecurityConsoleStore((state) => state.dashboard)
-  const runExecutiveDemo = useSecurityConsoleStore((state) => state.runExecutiveDemo)
+  const guide = useGuidedRun()
   const generateReport = useSecurityConsoleStore((state) => state.generateReport)
   const currentUser = useSecurityConsoleStore((state) => state.currentUser)
   const currentOrganization = useSecurityConsoleStore((state) => state.currentOrganization)
@@ -129,7 +126,6 @@ export function SiteHeader() {
   const notifications = useSecurityConsoleStore((state) => state.notifications)
   const markNotificationRead = useSecurityConsoleStore((state) => state.markNotificationRead)
   const markAllNotificationsRead = useSecurityConsoleStore((state) => state.markAllNotificationsRead)
-  const canRunSimulation = useSecurityConsoleStore((state) => state.can("run_simulation"))
   const canGenerateReport = useSecurityConsoleStore((state) => state.can("generate_report"))
   const { theme, toggleTheme } = useTheme()
   const { state: sidebarState } = useSidebar()
@@ -210,26 +206,26 @@ export function SiteHeader() {
           <Button variant="outline" size="icon-sm" className="lg:hidden" onClick={toggleTheme} aria-label="Tema değiştir">
             {theme === "dark" ? <SunMediumIcon /> : <MoonStarIcon />}
           </Button>
-          <Badge variant="outline">{environment.assets.length ? `Score ${dashboard.securityScore}` : "Ölçüm yok"}</Badge>
-          <Badge variant="outline">Critical {environment.events.filter((event) => event.severity === "critical").length}</Badge>
+          <Badge variant="outline" className="hidden xl:inline-flex">{environment.assets.length ? `Score ${dashboard.securityScore}` : "Ölçüm yok"}</Badge>
+          <Badge variant="outline" className="hidden xl:inline-flex">Critical {environment.events.filter((event) => event.severity === "critical").length}</Badge>
           <Button variant="outline" size="sm" onClick={toggleTheme} className="hidden lg:inline-flex">
             {theme === "dark" ? <SunMediumIcon /> : <MoonStarIcon />}
             {theme === "dark" ? "Light" : "Dark"}
           </Button>
           <Button
             size="sm"
-            onClick={() => void runExecutiveDemo()}
-            disabled={!canRunSimulation}
-            title={!canRunSimulation ? "Bu aksiyon için uygun rol gerekir." : undefined}
-            className="hidden lg:inline-flex"
+            onClick={() => { guide.dispatch("open"); router.push("/dashboard#guided-run") }}
+            aria-label="Guided Run öğreticisini aç"
+            className="inline-flex"
           >
             <PlayIcon />
-            Guided Run
+            <span className="hidden lg:inline">Guided Run</span>
           </Button>
           <Button
             variant="outline"
             size="icon-sm"
             aria-label="Hızlı rapor üret"
+            className="hidden sm:inline-flex"
             onClick={() => generateReport()}
             disabled={!canGenerateReport}
             title={!canGenerateReport ? "Bu aksiyon için rapor üretme yetkisi gerekir." : undefined}
@@ -262,7 +258,7 @@ export function SiteHeader() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {notifications.length ? (
-                <div className="max-h-[420px] overflow-y-auto">
+                <div className="max-h-[min(420px,calc(var(--radix-dropdown-menu-content-available-height)-4rem))] overflow-y-auto">
                   {notifications.slice(0, 10).map((notification) => (
                     <DropdownMenuItem
                       key={notification.id}
@@ -306,15 +302,15 @@ export function SiteHeader() {
           </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button variant="outline" size="sm" className="gap-2" aria-label="Profil menüsü">
                 <Avatar className="size-6">
                   <AvatarFallback>{currentUser?.avatarInitials ?? "HC"}</AvatarFallback>
                 </Avatar>
-                <span className="max-w-[140px] truncate">{currentUser?.name ?? "Oturum"}</span>
-                <ChevronDownIcon className="size-4 text-muted-foreground" />
+                <span className="hidden max-w-[140px] truncate sm:inline">{currentUser?.name ?? "Oturum"}</span>
+                <ChevronDownIcon className="hidden size-4 text-muted-foreground sm:block" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="z-[70] w-72">
+            <DropdownMenuContent align="end" side="bottom" sideOffset={8} collisionPadding={12} className="z-[70] w-72 max-w-[calc(var(--hcsc-scaled-viewport-width)-2rem)]">
               <DropdownMenuLabel>
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-foreground">{currentUser?.name}</p>
@@ -323,7 +319,7 @@ export function SiteHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {currentUser?.isSystemOwner ? (
+              {currentUser?.isSystemOwner || currentUser?.canAccessAdmin ? (
                 <DropdownMenuItem onClick={() => router.push("/admin")}>
                   <ShieldCheckIcon />
                   Admin Console

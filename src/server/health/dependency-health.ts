@@ -1,6 +1,6 @@
 import "server-only";
 
-import { prisma } from "@/server/db/prisma";
+import { assertDatabaseIsolation } from "@/lib/database-isolation";
 
 export type DependencyStatus = "healthy" | "degraded" | "unavailable" | "not_configured";
 
@@ -34,10 +34,27 @@ function safeBaseUrl(value: string | undefined, allowLocalhost = false) {
 
 export async function probeDatabase(): Promise<DependencyProbe> {
   const startedAt = Date.now();
+  if (!process.env.DATABASE_URL?.trim()) {
+    return { status: "not_configured", latencyMs: 0, message: "Database is not configured." };
+  }
   try {
+    // Check on every probe, including when the Prisma module is already cached.
+    assertDatabaseIsolation(process.env);
+  } catch {
+    return { status: "unavailable", latencyMs: elapsed(startedAt), message: "Database target configuration was rejected." };
+  }
+  try {
+    // Initialization can fail. Keep it inside the boundary so readiness still
+    // returns a sanitized 503 instead of crashing while importing the route.
+    const { prisma } = await import("@/server/db/prisma");
     await prisma.$queryRaw`SELECT 1`;
     await prisma.$queryRaw`SELECT "id", "tokenCiphertext", "lastCheck" FROM "ConnectedDomain" LIMIT 0`;
     await prisma.$queryRaw`SELECT "id", "signingSecretCiphertext" FROM "IntegrationEndpoint" LIMIT 0`;
+    // LIMIT 0 validates the auth schema without reading user or credential rows.
+    await prisma.$queryRaw`SELECT u."platformRole", f."enrolledAt", f."lastVerifiedAt", f."lastVerifiedStep",
+      p."tokenHash", i."tokenHash", a."key", s."usageType", s."defaultCurrency", s."setupCompletedAt"
+      FROM "User" u, "TwoFactorSecret" f, "PasswordResetToken" p,
+        "OrganizationInvite" i, "AppSetting" a, "OrganizationSettings" s LIMIT 0`;
     return { status: "healthy", latencyMs: elapsed(startedAt), message: "Database query completed." };
   } catch {
     return { status: "unavailable", latencyMs: elapsed(startedAt), message: "Database query failed." };

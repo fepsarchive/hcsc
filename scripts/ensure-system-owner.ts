@@ -1,4 +1,5 @@
-import "dotenv/config";
+import { loadEnvConfig } from "@next/env";
+import { assertDatabaseIsolation } from "../src/lib/database-isolation";
 
 import { createHash, scryptSync, timingSafeEqual } from "node:crypto";
 
@@ -100,6 +101,8 @@ function verifyProductionPassword(password: string, passwordHash: string) {
 }
 
 function createPrismaClient() {
+  loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production");
+  assertDatabaseIsolation(process.env);
   return new PrismaClient({
     adapter: new PrismaPg({ connectionString: requireDatabaseUrl() }),
   });

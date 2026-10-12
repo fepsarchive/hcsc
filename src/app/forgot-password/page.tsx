@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
       eyebrow="Password Recovery"
       title="Şifreni yenile"
       description="Hesabına yeniden erişmek için e-posta adresini paylaş. Platform, kullanıcı dostu ama güvenli bir geri bildirim üretir."
-      footer={<AuthLinks primaryHref="/login" primaryLabel="Giriş ekranına dön" secondaryHref="/register" secondaryLabel="Yeni hesap oluştur" />}
+      footer={<AuthLinks primaryHref="/login" primaryLabel="Giriş ekranına dön" />}
     >
       <div className="space-y-4">
         {error ? <AuthMessage tone="critical" title="İstek alınamadı" description={error} /> : null}

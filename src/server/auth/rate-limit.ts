@@ -15,6 +15,7 @@ type RateLimitWindow = {
 };
 
 type RateLimitPolicyName =
+  | "admin_provision"
   | "domain_check"
   | "login"
   | "register"
@@ -49,14 +50,10 @@ type RateLimitDecision = {
   scope: string;
 };
 
-type UpstashPipelineResponse = Array<{
-  result?: number | string | null;
-  error?: string | null;
-}>;
-
 const rateLimitStore = new Map<string, RateLimitStoreEntry>();
 const UPSTASH_TIMEOUT_MS = 2000;
 const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitWindow[]> = {
+  admin_provision: [{ name: "user", scope: "user", limit: 10, windowMs: 60 * 60 * 1000 }],
   domain_check: [{ name: "user", scope: "user", limit: 12, windowMs: 60_000 }],
   login: [
     { name: "email_ip", scope: "email_ip", limit: 5, windowMs: 1000 * 60 * 5 },
@@ -130,8 +127,8 @@ function logMissingUpstashWarning() {
   if (process.env.NODE_ENV === "production" && !hasLoggedMissingUpstashWarning) {
     hasLoggedMissingUpstashWarning = true;
     console.warn("[rate-limit]", {
-      event: "rate_limit_fallback",
-      provider: "memory",
+      event: "rate_limit_unavailable",
+      provider: "upstash",
       mode: "missing_config",
       reason: "upstash_env_missing",
       environment: process.env.NODE_ENV,
@@ -144,7 +141,7 @@ function logDisabledProductionWarning() {
     hasLoggedDisabledProductionWarning = true;
     console.warn("[rate-limit]", {
       event: "rate_limit_bypass_rejected",
-      provider: "memory",
+      provider: "upstash",
       mode: "production",
       reason: "rate_limit_disabled_ignored",
       environment: process.env.NODE_ENV,
@@ -158,9 +155,9 @@ function logUpstashFailure(reason: string, policyName?: string) {
   if (!upstashErrorWarnings.has(warningKey)) {
     upstashErrorWarnings.add(warningKey);
     console.warn("[rate-limit]", {
-      event: "rate_limit_fallback",
+      event: process.env.NODE_ENV === "production" ? "rate_limit_unavailable" : "rate_limit_fallback",
       provider: "upstash",
-      mode: "fallback_to_memory",
+      mode: process.env.NODE_ENV === "production" ? "fail_closed" : "fallback_to_memory",
       reason,
       policy: policyName ?? "unknown",
       environment: process.env.NODE_ENV,
@@ -260,10 +257,8 @@ async function consumeUpstashRateLimit(input: ConsumeRateLimitInput): Promise<Ra
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort("upstash_timeout"), UPSTASH_TIMEOUT_MS);
 
-  let response: Response;
-
   try {
-    response = await fetch(`${process.env.UPSTASH_REDIS_REST_URL}/pipeline`, {
+    const response = await fetch(`${process.env.UPSTASH_REDIS_REST_URL?.trim().replace(/\/$/, "")}/pipeline`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
@@ -275,42 +270,47 @@ async function consumeUpstashRateLimit(input: ConsumeRateLimitInput): Promise<Ra
         ["PTTL", input.key],
       ]),
       cache: "no-store",
+      redirect: "error",
       signal: controller.signal,
     });
+
+    if (!response.ok) throw new Error(`upstash_http_${response.status}`);
+
+    // HTTP 200 can contain errors for individual Redis commands. Validate all
+    // results before granting a request, including an established expiry.
+    const payload: unknown = await response.json();
+    if (!Array.isArray(payload) || payload.length !== 3 || payload.some((entry) =>
+      !entry || typeof entry !== "object" || entry.error != null ||
+      typeof entry.result !== "number" || !Number.isSafeInteger(entry.result)
+    )) throw new Error("upstash_invalid_pipeline");
+    const count: number = payload[0].result;
+    const expiry: number = payload[1].result;
+    const ttl: number = payload[2].result;
+    if (count <= 0 || (expiry !== 0 && expiry !== 1) || ttl < 0 || ttl > input.windowMs) {
+      throw new Error("upstash_invalid_window");
+    }
+    const effectiveTtl = Math.max(1, ttl);
+    return {
+      allowed: count <= input.limit,
+      limit: input.limit,
+      remaining: Math.max(0, input.limit - count),
+      resetAt: currentTime + effectiveTtl,
+      retryAfterSeconds: toSeconds(effectiveTtl),
+      source: "upstash",
+      scope: input.key,
+    };
   } catch (error) {
     if (controller.signal.aborted) {
       throw new Error("upstash_timeout");
     }
 
-    throw error;
+    // Do not log provider bodies or arbitrary transport errors containing URLs.
+    throw new Error(error instanceof Error && /^upstash_(http_\d{3}|invalid_pipeline|invalid_window)$/.test(error.message)
+      ? error.message : "upstash_request_failed");
   } finally {
     clearTimeout(timeoutId);
   }
 
-  if (!response.ok) {
-    throw new Error(`upstash_http_${response.status}`);
-  }
-
-  const payload = (await response.json()) as UpstashPipelineResponse;
-  const count = Number(payload[0]?.result ?? 0);
-  const ttl = Number(payload[2]?.result ?? input.windowMs);
-
-  if (!Number.isFinite(count) || count <= 0) {
-    throw new Error("upstash_invalid_count");
-  }
-
-  const effectiveTtl = ttl > 0 ? ttl : input.windowMs;
-  const resetAt = currentTime + effectiveTtl;
-
-  return {
-    allowed: count <= input.limit,
-    limit: input.limit,
-    remaining: Math.max(0, input.limit - count),
-    resetAt,
-    retryAfterSeconds: toSeconds(effectiveTtl),
-    source: "upstash",
-    scope: input.key,
-  };
 }
 
 async function consumeDistributedRateLimit(input: ConsumeRateLimitInput, policyName: RateLimitPolicyName) {

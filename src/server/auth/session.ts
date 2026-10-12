@@ -5,6 +5,7 @@ import type { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/server/db/prisma";
 import { createSecurityEvent } from "@/server/security/security-event-service";
+import { isPasswordOnlyAdmin } from "@/server/auth/password-only-admin";
 
 export const SESSION_COOKIE_NAME = "hcsc_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
@@ -27,8 +28,11 @@ export function getSessionTokenFromRequest(request: NextRequest) {
   return request.cookies.get(SESSION_COOKIE_NAME)?.value ?? null;
 }
 
-export function setSessionCookie(response: NextResponse, token: string) {
-  response.cookies.set(SESSION_COOKIE_NAME, token, buildCookieOptions());
+export function setSessionCookie(response: NextResponse, token: string, expiresAt?: Date) {
+  response.cookies.set(SESSION_COOKIE_NAME, token, {
+    ...buildCookieOptions(),
+    ...(expiresAt ? { expires: expiresAt, maxAge: Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)) } : {}),
+  });
 }
 
 export function clearSessionCookie(response: NextResponse) {
@@ -45,10 +49,11 @@ export async function createPendingSession(input: {
   userAgent?: string | null;
   client?: Pick<typeof prisma, "session">;
   rawToken?: string;
+  expiresAt?: Date;
 }) {
   const rawToken = input.rawToken ?? randomBytes(32).toString("hex");
   const tokenHash = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+  const expiresAt = new Date(Math.min(Date.now() + SESSION_MAX_AGE_SECONDS * 1000, input.expiresAt?.getTime() ?? Infinity));
   const client = input.client ?? prisma;
 
   const session = await client.session.create({
@@ -73,10 +78,15 @@ export async function createVerifiedSession(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
   rawToken?: string;
+  passwordOnly?: boolean;
+  expiresAt?: Date;
 }) {
   const rawToken = input.rawToken ?? randomBytes(32).toString("hex");
   const tokenHash = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+  const expiresAt = new Date(Math.min(
+    Date.now() + (input.passwordOnly ? 60 * 60 : SESSION_MAX_AGE_SECONDS) * 1000,
+    input.expiresAt?.getTime() ?? Infinity,
+  ));
 
   const session = await prisma.session.create({
     data: {
@@ -84,7 +94,7 @@ export async function createVerifiedSession(input: {
       organizationId: input.organizationId,
       tokenHash,
       status: "active",
-      is2FAVerified: true,
+      is2FAVerified: !input.passwordOnly,
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
       expiresAt,
@@ -145,13 +155,18 @@ export async function getSessionContext(rawToken: string | null, client: Pick<ty
     return null;
   }
 
+  const twoFactorExempt = session.status === "active" && !session.is2FAVerified && isPasswordOnlyAdmin(session.user);
+  // Removing the exception or the admin role invalidates password-only sessions.
+  if (session.status === "active" && session.is2FAVerified === false && !twoFactorExempt) {
+    await client.session.update({ where: { id: session.id }, data: { status: "revoked" } });
+    return null;
+  }
   await client.session.update({
     where: { id: session.id },
     data: { lastSeenAt: new Date() },
   });
-
   // Tenant permissions must never inherit a role from another workspace.
-  return { ...session, user: { ...session.user, role: membership.role }, membership };
+  return { ...session, twoFactorExempt, user: { ...session.user, role: membership.role }, membership };
 }
 
 export async function markSessionTwoFactorVerified(sessionId: string) {
@@ -272,7 +287,7 @@ async function createAuthSecurityEvent(input: {
   device?: string | null;
   metadata?: Prisma.InputJsonValue;
 }) {
-  if (!["login_success", "login_failed", "two_factor_failed", "two_factor_verified", "system_owner_login_success"].includes(input.action)) {
+  if (!["login_success", "login_failed", "two_factor_failed", "two_factor_verified", "system_owner_login_success", "password_only_admin_login"].includes(input.action)) {
     return;
   }
 
@@ -281,11 +296,11 @@ async function createAuthSecurityEvent(input: {
       ? "auth_failure"
       : input.action === "two_factor_failed"
         ? "mfa_failure"
-        : input.action === "system_owner_login_success"
+        : input.action === "system_owner_login_success" || input.action === "password_only_admin_login"
           ? "admin_access_granted"
           : "login_success";
   const severity =
-    input.action === "login_failed" || input.action === "two_factor_failed"
+    input.action === "login_failed" || input.action === "two_factor_failed" || input.action === "password_only_admin_login"
       ? "medium"
       : "info";
 
@@ -301,6 +316,8 @@ async function createAuthSecurityEvent(input: {
         ? "Login failure detected"
         : input.action === "two_factor_failed"
           ? "MFA failure detected"
+          : input.action === "password_only_admin_login"
+            ? "Password-only admin exception used (MFA not verified)"
           : input.action === "system_owner_login_success"
             ? "System owner admin access granted"
             : "Authentication success",
@@ -318,6 +335,6 @@ async function createAuthSecurityEvent(input: {
       actorRole: input.actorRole,
       metadata: input.metadata,
     },
-    notify: input.action === "login_failed" || input.action === "two_factor_failed" || input.action === "system_owner_login_success",
+    notify: input.action === "login_failed" || input.action === "two_factor_failed" || input.action === "system_owner_login_success" || input.action === "password_only_admin_login",
   });
 }

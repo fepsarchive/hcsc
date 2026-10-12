@@ -61,6 +61,14 @@ const owner: AppUser = {
   isSystemOwner: true,
 };
 
+test("explicit password-only admin can navigate without claiming MFA verification", () => {
+  const auth = { ...verified, is2FAVerified: false, twoFactorExempt: true };
+  const admin = { ...user, canAccessAdmin: true };
+  assert.equal(resolveAppShellRedirect({ pathname: "/login", auth, currentUser: admin, onboardingCompleted: true }), "/admin");
+  assert.equal(resolveAppShellRedirect({ pathname: "/dashboard", auth, currentUser: admin, onboardingCompleted: true }), null);
+  assert.equal(resolveAppShellRedirect({ pathname: "/dashboard", auth: { ...auth, twoFactorExempt: false }, currentUser: admin, onboardingCompleted: true }), "/verify-2fa");
+});
+
 test("verify-2fa without pending state redirects to login", () => {
   assert.equal(
     resolveAppShellRedirect({

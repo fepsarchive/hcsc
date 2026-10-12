@@ -16,7 +16,6 @@ type SidebarItem = {
 
 const workspaceItems: SidebarItem[] = [
   { href: "/dashboard", label: "Dashboard", description: "Genel güvenlik görünümü", icon: "◫" },
-  { href: "/cloud-map", label: "Cloud Map", description: "Mimari ve akış topolojisi", icon: "◎" },
   { href: "/data-assets", label: "Data Assets", description: "Veri varlıkları ve risk", icon: "▣" },
   { href: "/access-requests", label: "Access Requests", description: "Zero Trust talepleri", icon: "⇢" },
   { href: "/policy-engine", label: "Policy Engine", description: "PE / PA / PEP kuralları", icon: "⌘" },

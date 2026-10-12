@@ -97,13 +97,13 @@ export function AdminSettingsForm({ settings }: { settings: AdminSettingsPayload
 
         <label className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3">
           <Checkbox
-            checked={form.registrationEnabled}
-            onCheckedChange={(checked) => setForm((current) => ({ ...current, registrationEnabled: checked === true }))}
-            aria-label="Registration enabled"
+            checked={false}
+            disabled
+            aria-label="Herkese açık kayıt kapalı"
           />
           <span>
-            <span className="block text-sm font-medium text-[var(--text-primary)]">Registration enabled</span>
-            <span className="block text-xs leading-5 text-[var(--text-secondary)]">Yeni hesap kayıt politikasını platform ayarı olarak saklar.</span>
+            <span className="block text-sm font-medium text-[var(--text-primary)]">Yalnızca yönetici ile hesap oluşturma</span>
+            <span className="block text-xs leading-5 text-[var(--text-secondary)]">Herkese açık kayıt kapalıdır. Yeni müşteri hesabını Kullanıcılar bölümünden oluştur.</span>
           </span>
         </label>
 

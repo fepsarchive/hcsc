@@ -64,10 +64,10 @@ export function resolveAppShellRedirect(input: {
   }
 
   if (pathname === "/accept-invite") {
-    return auth.is2FAVerified ? null : "/verify-2fa";
+    return auth.is2FAVerified || auth.twoFactorExempt ? null : "/verify-2fa";
   }
 
-  if (!auth.is2FAVerified) {
+  if (!auth.is2FAVerified && !auth.twoFactorExempt) {
     return pathname === "/verify-2fa" ? null : "/verify-2fa";
   }
 
@@ -76,7 +76,7 @@ export function resolveAppShellRedirect(input: {
   }
 
   if (publicRoutes.has(pathname) && !isAlwaysAccessiblePublicPath(pathname)) {
-    return currentUser?.isSystemOwner ? "/admin" : "/dashboard";
+    return currentUser?.isSystemOwner || currentUser?.canAccessAdmin ? "/admin" : "/dashboard";
   }
 
   return null;

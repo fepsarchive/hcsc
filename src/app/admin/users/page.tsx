@@ -1,6 +1,7 @@
 import { UsersIcon } from "lucide-react";
 
 import { AdminUsersTable } from "@/components/admin/admin-users-table";
+import { AdminProvisionUserForm } from "@/components/admin/admin-provision-user-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireAdminPageSession } from "@/server/admin/admin-auth";
@@ -27,6 +28,8 @@ export default async function AdminUsersPage({
         </p>
       </div>
 
+      <AdminProvisionUserForm />
+
       <Card>
         <CardHeader>
           <CardTitle>User Management</CardTitle>
@@ -34,12 +37,12 @@ export default async function AdminUsersPage({
         </CardHeader>
         <CardContent>
           {users.length ? (
-            <AdminUsersTable users={users} currentUserId={session.userId} query={q} />
+            <AdminUsersTable key={JSON.stringify(users)} users={users} currentUserId={session.userId} query={q} />
           ) : (
             <EmptyState
               icon={<UsersIcon className="size-5" />}
               title="Kullanıcı bulunamadı"
-              description="Arama kriterini değiştir veya seed verisinin yüklü olduğundan emin ol."
+              description="Arama kriterini değiştir veya yukarıdaki formdan yeni müşteri hesabı oluştur."
             />
           )}
         </CardContent>

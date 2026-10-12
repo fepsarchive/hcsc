@@ -10,7 +10,6 @@ import {
   LayoutDashboardIcon,
   ListChecksIcon,
   LogsIcon,
-  NetworkIcon,
   PresentationIcon,
   RadarIcon,
   ScanSearchIcon,
@@ -43,7 +42,6 @@ import { cn } from "@/lib/utils"
 const workspaceItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Domain Bağlantıları", href: "/domains", icon: ShieldCheckIcon },
-  { title: "Cloud Map", href: "/cloud-map", icon: NetworkIcon },
   { title: "Data Assets", href: "/data-assets", icon: DatabaseIcon },
   { title: "Access Requests", href: "/access-requests", icon: ShieldCheckIcon },
   { title: "Policy Engine", href: "/policy-engine", icon: ShieldIcon },

@@ -6,6 +6,7 @@ import { consumeRecoveryCode } from "@/server/auth/recovery-codes";
 import { applyRateLimitHeaders, consumeRateLimitPolicy } from "@/server/auth/rate-limit";
 import { buildRequestMeta, createAuthAuditLog, getSessionContext, getSessionTokenFromRequest } from "@/server/auth/session";
 import { isSystemOwner } from "@/server/auth/system-owner";
+import { isConfiguredAdmin } from "@/server/auth/password-only-admin";
 import { isReplayProtectedStep, isTwoFactorEnrolled, persistSuccessfulTwoFactorVerification, verifyTwoFactorCode } from "@/server/auth/two-factor";
 
 const verifySchema = z.object({
@@ -181,7 +182,7 @@ export async function POST(request: NextRequest) {
       device: meta.userAgent,
     });
 
-    const redirectTo = isSystemOwner(updatedSession.user)
+    const redirectTo = isSystemOwner(updatedSession.user) || isConfiguredAdmin(updatedSession.user)
       ? "/admin"
       : updatedSession.organization.onboardingCompleted
         ? "/dashboard"
@@ -334,7 +335,7 @@ export async function POST(request: NextRequest) {
     device: meta.userAgent,
   });
 
-  const redirectTo = isSystemOwner(updatedSession.user)
+  const redirectTo = isSystemOwner(updatedSession.user) || isConfiguredAdmin(updatedSession.user)
     ? "/admin"
     : updatedSession.organization.onboardingCompleted
       ? "/dashboard"

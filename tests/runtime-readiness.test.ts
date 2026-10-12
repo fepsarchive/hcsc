@@ -24,6 +24,13 @@ const validProduction: RuntimeEnvironment = {
 };
 
 describe("runtime readiness", () => {
+  it("reports the approved admin exception and rejects incomplete identity configuration", () => {
+    const incomplete = evaluateRuntimeReadiness({ ...validProduction, HCSC_PASSWORD_ONLY_ADMIN_ENABLED: "true" });
+    assert.equal(incomplete.ready, false);
+    const complete = evaluateRuntimeReadiness({ ...validProduction, HCSC_PASSWORD_ONLY_ADMIN_ENABLED: "true", HCSC_PASSWORD_ONLY_ADMIN_USER_ID: "approved-id", HCSC_PASSWORD_ONLY_ADMIN_EMAIL: "admin@example.test" });
+    assert.equal(complete.ready, true);
+    assert.ok(complete.warnings.some((warning) => warning.includes("does not use MFA")));
+  });
   it("accepts a hardened managed-Strix production configuration", () => {
     const result = evaluateRuntimeReadiness(validProduction);
     assert.equal(result.ready, true);

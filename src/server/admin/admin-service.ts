@@ -62,7 +62,7 @@ type AdminUserEntity = Prisma.UserGetPayload<{
 const settingDefaults: AdminSettingsPayload = {
   applicationName: "HCSC.space",
   maintenanceMode: false,
-  registrationEnabled: true,
+  registrationEnabled: false,
   adminContactEmail: "security.admin@hcsc.local",
   systemNoticeMessage: "HCSC v2 foundation operational.",
   securityScanVisibility: true,
@@ -596,7 +596,7 @@ export async function getAdminSettings(): Promise<AdminSettingsPayload> {
   return {
     applicationName: readString(values.get("applicationName"), settingDefaults.applicationName),
     maintenanceMode: readBoolean(values.get("maintenanceMode"), settingDefaults.maintenanceMode),
-    registrationEnabled: readBoolean(values.get("registrationEnabled"), settingDefaults.registrationEnabled),
+    registrationEnabled: false,
     adminContactEmail: readString(values.get("adminContactEmail"), settingDefaults.adminContactEmail),
     systemNoticeMessage: readString(values.get("systemNoticeMessage"), settingDefaults.systemNoticeMessage),
     securityScanVisibility: readBoolean(values.get("securityScanVisibility"), settingDefaults.securityScanVisibility),
@@ -610,7 +610,7 @@ export async function updateAdminSettings(input: {
   ipAddress?: string | null;
   device?: string | null;
 }) {
-  const entries = Object.entries(input.settings) as Array<[keyof AdminSettingsPayload, string | boolean]>;
+  const entries = Object.entries({ ...input.settings, registrationEnabled: false }) as Array<[keyof AdminSettingsPayload, string | boolean]>;
 
   await prisma.$transaction(
     entries.map(([key, value]) =>

@@ -141,6 +141,7 @@ export interface AppUser {
   role: UserRole;
   platformRole: PlatformRole;
   isSystemOwner: boolean;
+  canAccessAdmin?: boolean;
   avatarInitials: string;
   department: string;
   mfaEnabled: boolean;
@@ -163,6 +164,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   requiresTwoFactor: boolean;
   is2FAVerified: boolean;
+  twoFactorExempt?: boolean;
   currentUserId: string | null;
   sessionStartedAt: string | null;
   lastLoginAt: string | null;
@@ -518,32 +520,6 @@ export interface ArchitectureLayer {
   detail: string;
 }
 
-export interface CloudMapNode {
-  id: string;
-  label: string;
-  kind:
-    | "user"
-    | "device"
-    | "security"
-    | "cloud"
-    | "data"
-    | "compliance"
-    | "deception";
-  riskLevel: RiskLevel;
-  description: string;
-  relatedAssetIds: string[];
-  relatedEventIds: string[];
-  recommendedControls: string[];
-}
-
-export interface CloudMapLink {
-  id: string;
-  from: string;
-  to: string;
-  tone: "safe" | "warning" | "critical" | "deception";
-  label: string;
-}
-
 export interface ReportItem {
   id: string;
   title: string;
@@ -615,8 +591,6 @@ export interface DemoEnvironment {
   runs: SimulationRunResult[];
   reports: ReportItem[];
   demoScenario: DemoScenarioState;
-  cloudNodes: CloudMapNode[];
-  cloudLinks: CloudMapLink[];
 }
 
 export interface DashboardSummary {

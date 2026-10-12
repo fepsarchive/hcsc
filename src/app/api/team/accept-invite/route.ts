@@ -44,17 +44,19 @@ export async function POST(request: NextRequest) {
     return apiError(auth.context.requestId, 409, result.code, result.message);
   }
 
-  const { rawToken } = await createVerifiedSession({
+  const { rawToken, session } = await createVerifiedSession({
     userId: auth.context.session.userId,
     organizationId: result.organization.id,
     ipAddress: auth.context.ipAddress,
     userAgent: auth.context.userAgent,
+    passwordOnly: auth.context.session.twoFactorExempt,
+    expiresAt: auth.context.session.expiresAt,
   });
 
   await revokeSession(auth.context.session.id);
 
   const response = apiOk(auth.context.requestId, result);
-  setSessionCookie(response, rawToken);
+  setSessionCookie(response, rawToken, session.expiresAt);
 
   return response;
 }

@@ -135,7 +135,7 @@ export default function ResetPasswordPage() {
           <div className="flex items-start gap-3">
             <CheckCircle2Icon className="mt-0.5 size-4 shrink-0" />
             <p className="leading-6">
-              Bu akış yalnızca hesap kurtarma için kullanılır; erişim politikaları, olay kaydı ve oturum iptali otomatik olarak arka planda işlenir.
+              Bu akış ilk parola belirleme ve hesap kurtarma için kullanılır. Parola belirlemek 2FA doğrulamasının yerine geçmez; girişte doğrulama veya ilk kurulum istenir.
             </p>
           </div>
         </div>

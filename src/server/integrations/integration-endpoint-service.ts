@@ -3,7 +3,8 @@ import "server-only";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 
 import { prisma } from "@/server/db/prisma";
-import { assertSafeOutboundUrl } from "@/server/integrations/outbound-url-policy";
+import { assertSafeOutboundUrl, OutboundPolicyError } from "@/server/integrations/outbound-url-policy";
+import { postSafeWebhook } from "@/server/integrations/outbound-transport";
 import { decryptIntegrationSecret, encryptIntegrationSecret } from "@/server/integrations/secret-crypto";
 
 export type OutboundEventType = "security_event" | "security_test_completed" | "report_ready";
@@ -21,7 +22,13 @@ function mapEndpoint(endpoint: {
   updatedAt: Date;
 }) {
   return {
-    ...endpoint,
+    // Never spread a database record here: it also contains the signing ciphertext.
+    id: endpoint.id,
+    name: endpoint.name,
+    endpointUrl: endpoint.endpointUrl,
+    isEnabled: endpoint.isEnabled,
+    lastDeliveryStatus: endpoint.lastDeliveryStatus,
+    lastResponseCode: endpoint.lastResponseCode,
     eventTypes: Array.isArray(endpoint.eventTypes) ? endpoint.eventTypes.map(String) : [],
     lastDeliveryAt: endpoint.lastDeliveryAt?.toISOString() ?? null,
     createdAt: endpoint.createdAt.toISOString(),
@@ -68,34 +75,27 @@ async function deliver(
   eventType: OutboundEventType,
   data: unknown,
 ) {
-  await assertSafeOutboundUrl(endpoint.endpointUrl);
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const deliveryId = randomUUID();
-  const body = JSON.stringify({ id: deliveryId, type: eventType, createdAt: new Date().toISOString(), data });
-  const secret = decryptIntegrationSecret(endpoint.signingSecretCiphertext);
-  const signature = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
 
   let statusCode: number | null = null;
   let deliveryStatus = "failed";
   try {
-    const response = await fetch(endpoint.endpointUrl, {
-      method: "POST",
-      headers: {
+    const body = JSON.stringify({ id: deliveryId, type: eventType, createdAt: new Date().toISOString(), data });
+    const secret = decryptIntegrationSecret(endpoint.signingSecretCiphertext);
+    const signature = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
+    const response = await postSafeWebhook(endpoint.endpointUrl, body, {
         "Content-Type": "application/json",
         "User-Agent": "HCSC-Webhook/1.0",
         "X-HCSC-Event": eventType,
         "X-HCSC-Delivery": deliveryId,
         "X-HCSC-Timestamp": timestamp,
         "X-HCSC-Signature": `sha256=${signature}`,
-      },
-      body,
-      redirect: "manual",
-      signal: AbortSignal.timeout(5_000),
     });
     statusCode = response.status;
     deliveryStatus = response.ok ? "delivered" : "rejected";
-  } catch {
-    deliveryStatus = "failed";
+  } catch (error) {
+    deliveryStatus = error instanceof OutboundPolicyError ? "blocked" : "failed";
   }
 
   await prisma.integrationEndpoint.update({
@@ -114,5 +114,10 @@ export async function testIntegrationEndpoint(organizationId: string, id: string
 export async function dispatchIntegrationEvent(organizationId: string, eventType: OutboundEventType, data: unknown) {
   const endpoints = await prisma.integrationEndpoint.findMany({ where: { organizationId, isEnabled: true } });
   const selected = endpoints.filter((endpoint) => Array.isArray(endpoint.eventTypes) && endpoint.eventTypes.map(String).includes(eventType));
-  return Promise.allSettled(selected.map((endpoint) => deliver(endpoint, eventType, data)));
+  const results: PromiseSettledResult<Awaited<ReturnType<typeof deliver>>>[] = [];
+  // Bound socket and payload pressure per event dispatch.
+  for (let offset = 0; offset < selected.length; offset += 4) {
+    results.push(...await Promise.allSettled(selected.slice(offset, offset + 4).map((endpoint) => deliver(endpoint, eventType, data))));
+  }
+  return results;
 }

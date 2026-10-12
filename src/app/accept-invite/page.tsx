@@ -72,7 +72,7 @@ export default function AcceptInvitePage() {
         eyebrow="Team Invite"
         title="Davet bağlantısı eksik"
         description="Takım davetini açmak için geçerli bir bağlantı gerekiyor."
-        footer={<AuthLinks primaryHref="/login" primaryLabel="Giriş ekranına dön" secondaryHref="/register" secondaryLabel="Yeni hesap oluştur" />}
+        footer={<AuthLinks primaryHref="/login" primaryLabel="Giriş ekranına dön" />}
       >
         <AuthMessage
           tone="warning"
@@ -89,12 +89,12 @@ export default function AcceptInvitePage() {
         eyebrow="Team Invite"
         title="Takım davetini kabul et"
         description="Bu çalışma alanına katılmak için önce hesabınla güvenli oturum açman gerekir."
-        footer={<AuthLinks primaryHref="/register" primaryLabel="Hesabın yok mu? Yeni hesap oluştur" secondaryHref="/login" secondaryLabel="Giriş ekranına dön" />}
+        footer={<AuthLinks primaryHref="/login" primaryLabel="Giriş ekranına dön" secondaryHref="/forgot-password" secondaryLabel="Şifremi unuttum" />}
       >
         <div className="space-y-4">
           <AuthMessage
             title="Davetin hazır"
-            description="Giriş yaptıktan sonra bu davet otomatik olarak kaldığı yerden devam eder."
+            description="Giriş yaptıktan sonra davet kaldığı yerden devam eder. Hesabın yoksa yöneticinden hesap oluşturmasını iste; herkese açık kayıt kapalıdır."
           />
           <Button className="h-11 w-full rounded-xl" onClick={handleStoreAndContinue}>
             Giriş yap ve devam et
@@ -105,7 +105,7 @@ export default function AcceptInvitePage() {
     );
   }
 
-  if (!auth.is2FAVerified) {
+  if (!auth.is2FAVerified && !auth.twoFactorExempt) {
     return (
       <AuthShell
         eyebrow="Team Invite"

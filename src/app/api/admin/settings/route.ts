@@ -9,7 +9,7 @@ import { parseRequestJson } from "@/server/api/validation";
 const settingsSchema = z.object({
   applicationName: z.string().trim().min(1).max(80),
   maintenanceMode: z.boolean(),
-  registrationEnabled: z.boolean(),
+  registrationEnabled: z.literal(false),
   adminContactEmail: z.email().trim(),
   systemNoticeMessage: z.string().trim().max(240),
   securityScanVisibility: z.boolean(),

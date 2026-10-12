@@ -81,6 +81,7 @@ export type AuthUserPayload = {
   authenticated: boolean;
   requiresTwoFactor?: boolean;
   twoFactorVerified: boolean;
+  twoFactorExempt?: boolean;
   sessionStartedAt: string | null;
   user: AppUser | null;
   organization: OrganizationProfile | null;
@@ -105,13 +106,6 @@ export type TwoFactorSetupPayload =
       manualSecret: string;
       otpauthUrl: string;
     };
-
-export type RegisterAccountPayload = {
-  fullName: string;
-  email: string;
-  password: string;
-  companyName: string;
-};
 
 export type ForgotPasswordResponse = {
   message: string;
@@ -485,13 +479,6 @@ async function request<T>(path: string, options: RequestOptions = {}) {
 
 export function getCurrentUser() {
   return request<AuthUserPayload>("/api/auth/me", { method: "GET" });
-}
-
-export function registerAccount(payload: RegisterAccountPayload) {
-  return request<AuthUserPayload>("/api/auth/register", {
-    method: "POST",
-    body: payload,
-  });
 }
 
 export function requestPasswordReset(email: string) {

@@ -3,6 +3,7 @@ import type { Organization, User, UserRole as DbUserRole, UserStatus as DbUserSt
 import { rolePermissions } from "@/lib/permissions";
 import { prisma } from "@/server/db/prisma";
 import { isSystemOwner } from "@/server/auth/system-owner";
+import { isConfiguredAdmin } from "@/server/auth/password-only-admin";
 import { createSecurityEvent } from "@/server/security/security-event-service";
 import type { AppUser, OrganizationProfile, Permission, UserRole } from "@/types";
 
@@ -47,6 +48,7 @@ export function mapDbUserToAppUser(user: Pick<User, "id" | "name" | "email" | "r
     role: mapDbRoleToClientRole(user.role),
     platformRole: user.platformRole,
     isSystemOwner: isSystemOwner(user),
+    canAccessAdmin: isSystemOwner(user) || isConfiguredAdmin(user),
     avatarInitials: user.avatarInitials || buildAvatarInitials(user.name),
     department: user.department ?? "Security",
     mfaEnabled: user.mfaEnabled,

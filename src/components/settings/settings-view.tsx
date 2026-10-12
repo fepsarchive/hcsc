@@ -211,7 +211,7 @@ export function SettingsView() {
         actions={
           <>
             <Badge variant="outline">{canManageSettings ? "Security Admin" : "Read only"}</Badge>
-            <Badge variant="outline">{auth.is2FAVerified ? "2FA active" : "2FA pending"}</Badge>
+            <Badge variant="outline">{auth.twoFactorExempt ? "2FA istisnası · yalnızca parola" : auth.is2FAVerified ? "2FA active" : "2FA pending"}</Badge>
           </>
         }
       />
@@ -300,7 +300,7 @@ export function SettingsView() {
               <SectionHeader icon={<ShieldCheckIcon className="size-5 text-cyan-300" />} eyebrow="Security" title="Oturum ve güvenlik" description="2FA, MFA ve varsayılan koruma görünürlüğü." />
               <div className="mt-5 flex flex-wrap gap-2">
                 <Badge variant="outline">{auth.isAuthenticated ? "Authenticated" : "Signed out"}</Badge>
-                <Badge variant="outline">{auth.is2FAVerified ? "2FA verified" : "2FA pending"}</Badge>
+                <Badge variant="outline">{auth.twoFactorExempt ? "2FA doğrulanmadı · admin istisnası" : auth.is2FAVerified ? "2FA verified" : "2FA pending"}</Badge>
                 <Badge variant="outline">{currentUser?.mfaEnabled ? "MFA enabled" : "MFA disabled"}</Badge>
               </div>
               <SecurityPreferencesEditor

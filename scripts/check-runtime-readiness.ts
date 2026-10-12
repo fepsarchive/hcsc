@@ -1,6 +1,7 @@
 import { loadEnvConfig } from "@next/env";
 
 import { evaluateRuntimeReadiness } from "../src/lib/runtime-readiness";
+import { assertDatabaseIsolation } from "../src/lib/database-isolation";
 
 loadEnvConfig(process.cwd());
 
@@ -9,6 +10,13 @@ const readiness = evaluateRuntimeReadiness({
   ...process.env,
   NODE_ENV: forceProduction ? "production" : process.env.NODE_ENV,
 });
+
+try {
+  assertDatabaseIsolation({ ...process.env, NODE_ENV: forceProduction ? "production" : process.env.NODE_ENV });
+} catch (error) {
+  readiness.ready = false;
+  readiness.issues.push({ key: "DATABASE_ISOLATION", code: "unsafe", message: error instanceof Error ? error.message : "DB target validation failed." });
+}
 
 const summary = {
   environment: readiness.environment,

@@ -73,10 +73,17 @@ export function evaluateRuntimeReadiness(env: RuntimeEnvironment): RuntimeReadin
   const issues: RuntimeReadinessIssue[] = [];
   const warnings: string[] = [];
 
+  if (value(env, "HCSC_PASSWORD_ONLY_ADMIN_ENABLED") === "true") {
+    warnings.push("An explicit password-only admin exception is enabled; this account does not use MFA.");
+    if (!value(env, "HCSC_PASSWORD_ONLY_ADMIN_USER_ID") || !value(env, "HCSC_PASSWORD_ONLY_ADMIN_EMAIL")) {
+      issues.push({ key: "HCSC_PASSWORD_ONLY_ADMIN", code: "missing", message: "Password-only admin requires both immutable user ID and email." });
+    }
+  }
+
   if (environment !== "production") {
     warnings.push("Production-only configuration rules were not enforced in this environment.");
     if (provider === "demo") warnings.push("Synthetic security-test provider is active.");
-    return { environment, provider, ready: true, issues, warnings };
+    return { environment, provider, ready: issues.length === 0, issues, warnings };
   }
 
   for (const key of productionRequiredKeys) {

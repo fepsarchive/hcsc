@@ -3,7 +3,6 @@ import "server-only";
 import type { PlatformRole, Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
 import { apiError } from "@/server/api/response";
 import { mapDbUserToAppUser } from "@/server/auth/permissions";
@@ -14,30 +13,27 @@ import {
   SESSION_COOKIE_NAME,
 } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
-import { getSystemOwnerConfig, isSystemOwner } from "@/server/auth/system-owner";
+import { getSystemOwnerConfig } from "@/server/auth/system-owner";
 import { createSecurityEvent } from "@/server/security/security-event-service";
+import { hasCompletedAuthentication } from "@/server/auth/password-only-admin";
+import { isSystemOwnerSession } from "@/server/admin/admin-access-policy";
+export { isSystemOwnerSession } from "@/server/admin/admin-access-policy";
 
 export type AdminSessionContext = NonNullable<Awaited<ReturnType<typeof getSessionContext>>>;
 
-export function isSystemOwnerSession(session: AdminSessionContext | null) {
-  return (
-    session?.is2FAVerified === true &&
-    session.user.status === "active" &&
-    isSystemOwner(session.user)
-  );
-}
-
 export async function requireSystemOwnerPageSession() {
+  // API guards must not load the page navigation runtime.
+  const { redirect } = await import("next/navigation");
   const cookieStore = await cookies();
   const rawToken = cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null;
   const session = await getSessionContext(rawToken);
 
   if (!session) {
-    redirect("/login");
+    return redirect("/login");
   }
 
-  if (!session.is2FAVerified) {
-    redirect("/verify-2fa");
+  if (!hasCompletedAuthentication(session)) {
+    return redirect("/verify-2fa");
   }
 
   if (!isSystemOwnerSession(session)) {
@@ -49,7 +45,7 @@ export async function requireSystemOwnerPageSession() {
       severity: "warning",
       details: "System owner olmayan kullanıcı admin sayfasına erişmeye çalıştı.",
     });
-    redirect("/dashboard");
+    return redirect("/dashboard");
   }
 
   return session;
@@ -68,7 +64,7 @@ export async function requireSystemOwnerApiAuth(request: NextRequest) {
     };
   }
 
-  if (!session.is2FAVerified) {
+  if (!hasCompletedAuthentication(session)) {
     return {
       ok: false as const,
       response: apiError(meta.requestId, 403, "TWO_FACTOR_REQUIRED", "Admin işlemi için 2FA doğrulaması gerekli."),
@@ -109,7 +105,7 @@ export function getAdminAccessMode() {
   const config = getSystemOwnerConfig();
 
   return {
-    mode: "System Owner Only",
+    mode: process.env.HCSC_PASSWORD_ONLY_ADMIN_ENABLED === "true" ? "System Owner + Explicit Password-only Admin" : "System Owner + Configured MFA Admin",
     ownerSource: config.source,
     envConfigured: config.envConfigured,
   };

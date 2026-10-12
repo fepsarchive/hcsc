@@ -1,10 +1,19 @@
-import "dotenv/config";
 import assert from "node:assert/strict";
-import test, { mock } from "node:test";
-import { getSessionContext } from "../../src/server/auth/session";
-import { getApplicationPolicy } from "../../src/server/auth/application-policy";
-import { sendPasswordResetMail } from "../../src/server/mail/resend-mailer";
-import { probeCache } from "../../src/server/health/dependency-health";
+import test, { before, mock } from "node:test";
+import type { PrismaClient } from "@prisma/client";
+
+// Never load workspace credentials or instantiate a real DB for isolated tests.
+(globalThis as typeof globalThis & { prisma?: PrismaClient }).prisma = {} as PrismaClient;
+let getSessionContext: typeof import("../../src/server/auth/session").getSessionContext;
+let getApplicationPolicy: typeof import("../../src/server/auth/application-policy").getApplicationPolicy;
+let sendPasswordResetMail: typeof import("../../src/server/mail/resend-mailer").sendPasswordResetMail;
+let probeCache: typeof import("../../src/server/health/dependency-health").probeCache;
+before(async () => {
+  ({ getSessionContext } = await import("../../src/server/auth/session"));
+  ({ getApplicationPolicy } = await import("../../src/server/auth/application-policy"));
+  ({ sendPasswordResetMail } = await import("../../src/server/mail/resend-mailer"));
+  ({ probeCache } = await import("../../src/server/health/dependency-health"));
+});
 
 function fixture(options: { status?: string; membership?: boolean; role?: string; sessionStatus?: string } = {}) {
   const updates: unknown[] = [];

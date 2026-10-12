@@ -85,8 +85,6 @@ export async function buildEnvironmentWithoutCompliance(organizationId: string) 
     runs: runs.map(mapSimulationRunRecord),
     reports: mappedReports,
     demoScenario: foundation.demoScenario,
-    cloudNodes: foundation.cloudNodes,
-    cloudLinks: foundation.cloudLinks,
   } satisfies Omit<DemoEnvironment, "compliance">;
 }
 

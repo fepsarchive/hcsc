@@ -38,7 +38,6 @@ import {
   markNotificationRead as markNotificationReadApi,
   recalculateAssetRisk as recalculateAssetRiskApi,
   recalculateCompliance as recalculateComplianceApi,
-  registerAccount,
   requestPasswordReset as requestPasswordResetApi,
   runEventPlaybook,
   runExecutiveDemo as runExecutiveDemoApi,
@@ -103,13 +102,6 @@ type AuthActionResult = {
   error?: string;
   message?: string;
   redirectTo?: string;
-};
-
-type RegisterAccountPayload = {
-  fullName: string;
-  email: string;
-  password: string;
-  companyName: string;
 };
 
 type CreateAuditLogPayload = Omit<AuditLogItem, "id" | "timestamp" | "ipAddress" | "device" | "actorId" | "actorName" | "actorRole"> & {
@@ -231,7 +223,6 @@ export type SecurityConsoleStore = {
   refreshNotifications: () => Promise<void>;
   refreshSettings: () => Promise<void>;
   login: (email: string, password: string) => Promise<AuthActionResult>;
-  register: (payload: RegisterAccountPayload) => Promise<AuthActionResult>;
   requestPasswordReset: (email: string) => Promise<AuthActionResult>;
   verify2FA: (code: string, method?: "totp" | "recovery") => Promise<AuthActionResult>;
   logout: () => Promise<void>;
@@ -378,6 +369,7 @@ type AuthApiPayload = {
   authenticated: boolean;
   requiresTwoFactor?: boolean;
   twoFactorVerified: boolean;
+  twoFactorExempt?: boolean;
   sessionStartedAt: string | null;
   user: AppUser | null;
   organization: OrganizationProfile | null;
@@ -434,6 +426,7 @@ function applyServerAuthPayload(data: AuthApiPayload | null) {
       isAuthenticated: data.authenticated,
       requiresTwoFactor: data.requiresTwoFactor ?? false,
       is2FAVerified: data.twoFactorVerified,
+      twoFactorExempt: data.twoFactorExempt === true,
       currentUserId: data.user.id,
       sessionStartedAt: data.sessionStartedAt,
       lastLoginAt: data.user.lastLoginAt,
@@ -646,7 +639,6 @@ function buildSnapshot(environment: DemoEnvironment, meta: StoreMeta): Omit<
   | "runRiskAnalysis"
   | "hydrateAuthSession"
   | "login"
-  | "register"
   | "requestPasswordReset"
   | "verify2FA"
   | "logout"
@@ -910,7 +902,7 @@ function applyDemoStep(current: DemoEnvironment, stepIndex: number) {
 }
 
 async function hydrateEnvironmentFromApi(options?: { silent?: boolean }) {
-  if (!currentMeta.auth.isAuthenticated || !currentMeta.auth.is2FAVerified) {
+  if (!currentMeta.auth.isAuthenticated || !(currentMeta.auth.is2FAVerified || currentMeta.auth.twoFactorExempt)) {
     return false;
   }
 
@@ -1043,7 +1035,6 @@ const actions: Pick<
   | "runRiskAnalysis"
   | "hydrateAuthSession"
   | "login"
-  | "register"
   | "requestPasswordReset"
   | "verify2FA"
   | "logout"
@@ -2052,7 +2043,7 @@ const actions: Pick<
         const result = await getCurrentUser();
         applyServerAuthPayload(result);
 
-        if (result.authenticated && result.twoFactorVerified) {
+        if (result.authenticated && (result.twoFactorVerified || result.twoFactorExempt)) {
           await hydrateEnvironmentFromApi({ silent: true });
         }
         // A successful server response is authoritative, including an anonymous
@@ -2118,11 +2109,13 @@ const actions: Pick<
       if (result.success && result.data) {
         applyServerAuthPayload(result.data);
         pushToast({
-          title: result.data.twoFactorVerified ? "Test oturumu açıldı" : "Kimlik doğrulandı",
-          description: result.data.twoFactorVerified
+          title: result.data.twoFactorExempt ? "Admin oturumu açıldı" : result.data.twoFactorVerified ? "Test oturumu açıldı" : "Kimlik doğrulandı",
+          description: result.data.twoFactorExempt
+            ? "Bu hesap için tanımlı 2FA istisnası kullanıldı. Oturum 1 saat geçerlidir."
+            : result.data.twoFactorVerified
             ? "Denetimli development/test oturumu doğrudan çalışma alanına bağlandı."
             : "İkinci faktör kodunu doğrulayarak oturumu tamamlayın.",
-          tone: result.data.twoFactorVerified ? "success" : "policy",
+          tone: result.data.twoFactorExempt || result.data.twoFactorVerified ? "success" : "policy",
         });
         pushAuditLog({
           action: "login_success",
@@ -2130,7 +2123,9 @@ const actions: Pick<
           target: result.data.user?.email ?? email,
           severity: "info",
           result: "success",
-          details: result.data.twoFactorVerified
+          details: result.data.twoFactorExempt
+            ? "Admin parola ile giriş yaptı; hesaba özel 2FA istisnası uygulandı."
+            : result.data.twoFactorVerified
             ? "Denetimli development/test oturumu açıldı."
             : "Kullanıcı parolayla doğrulandı, 2FA bekleniyor.",
           actorName: result.data.user?.name ?? email,
@@ -2138,7 +2133,7 @@ const actions: Pick<
           actorId: result.data.user?.id ?? null,
         });
 
-        if (result.data.twoFactorVerified) {
+        if (result.data.twoFactorVerified || result.data.twoFactorExempt) {
           await hydrateEnvironmentFromApi({ silent: true });
         }
 
@@ -2241,49 +2236,6 @@ const actions: Pick<
     };
   },
 
-  async register(payload) {
-    try {
-      const result = await registerAccount(payload);
-
-      applyServerAuthPayload(result);
-      pushToast({
-        title: "Hesap oluşturuldu",
-        description: "İkinci faktör doğrulamasıyla oturumunu güvenli şekilde tamamlayabilirsin.",
-        tone: "success",
-      });
-
-      pushAuditLog({
-        action: "registration_completed",
-        module: "Authentication",
-        target: result.user?.email ?? payload.email,
-        severity: "info",
-        result: "success",
-        details: "Yeni hesap ve çalışma alanı oluşturuldu.",
-        actorName: result.user?.name ?? payload.fullName,
-        actorRole: result.user?.role ?? "Security Admin",
-        actorId: result.user?.id ?? null,
-      });
-
-      return {
-        success: true,
-        message: "Kayıt başarıyla tamamlandı. Devam etmek için 2FA doğrulamasını tamamla.",
-      };
-    } catch (error) {
-      const message = resolveApiErrorMessage(error, "Kayıt oluşturulamadı.");
-
-      if (!ALLOW_LOCAL_AUTH_FALLBACK) {
-        return {
-          success: false,
-          error: message,
-        };
-      }
-
-      return {
-        success: false,
-        error: message,
-      };
-    }
-  },
 
   async requestPasswordReset(email) {
     try {

@@ -487,6 +487,7 @@ model Asset {
   @@unique([organizationId, path])
   @@index([organizationId, classification])
   @@index([organizationId, riskLevel])
+  @@index([organizationId, inventoryStatus])
 }
 
 model IdentityProfile {
@@ -597,6 +598,7 @@ model SecurityEvent {
 
   @@index([organizationId, severity, status, createdAt])
   @@index([organizationId, category])
+  @@index([organizationId, riskScore, createdAt])
 }
 
 model EventTimelineEntry {

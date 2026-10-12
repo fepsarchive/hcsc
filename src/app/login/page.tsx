@@ -20,7 +20,6 @@ export default function LoginPage() {
   const { login } = useDemo();
   const isDevelopment = process.env.NODE_ENV === "development";
   const registeredEmail = searchParams.get("email");
-  const registrationCompleted = searchParams.get("registered") === "1";
 
   const [email, setEmail] = useState(registeredEmail ?? (isDevelopment ? (mockAuthAccounts[0]?.email ?? "") : ""));
   const [password, setPassword] = useState(isDevelopment ? "demo123" : "");
@@ -92,10 +91,8 @@ export default function LoginPage() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <AuthLinks
-              primaryHref="/register"
-              primaryLabel="Yeni hesap oluştur"
-              secondaryHref="/forgot-password"
-              secondaryLabel="Şifremi unuttum"
+              primaryHref="/forgot-password"
+              primaryLabel="Şifremi unuttum"
             />
             {isDevelopment ? <Badge variant="outline">Hazır erişim profilleri</Badge> : null}
           </div>
@@ -130,14 +127,6 @@ export default function LoginPage() {
       }
     >
       <div className="space-y-4">
-        {registrationCompleted ? (
-          <AuthMessage
-            tone="success"
-            title="Kayıt tamamlandı"
-            description="Hesabın oluşturuldu. Giriş yaparak doğrulama adımını tamamlayabilir ve çalışma alanına geçebilirsin."
-          />
-        ) : null}
-
         {error ? (
           <AuthMessage
             tone="critical"
