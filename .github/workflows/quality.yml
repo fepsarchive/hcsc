@@ -21,6 +21,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://hcsc:hcsc@127.0.0.1:5432/hcsc?sslmode=disable
       DIRECT_URL: postgresql://hcsc:hcsc@127.0.0.1:5432/hcsc?sslmode=disable
+      # Synthetic CI target only; never production credentials or a remote DB.
+      HCSC_DATABASE_TARGET_FINGERPRINT: e64eebb8a5a7eea0b5170a3c19bfa22975ff99fc67220977a8218da164ca971d
+      HCSC_PRODUCTION_DATABASE_FINGERPRINT: e64eebb8a5a7eea0b5170a3c19bfa22975ff99fc67220977a8218da164ca971d
       APP_URL: https://hcsc.example.test
       SESSION_SECRET: ci-session-secret-0123456789-abcdefghijklmnopqrstuvwxyz
       JWT_SECRET: ci-jwt-secret-0123456789-abcdefghijklmnopqrstuvwxyz

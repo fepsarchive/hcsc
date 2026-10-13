@@ -118,6 +118,8 @@ Kurtarma kodlarını yalnızca hesap sahibi güvenli saklamalıdır. Paylaşıla
 
 ## Yapılandırma ve yayın kapısı
 
+**Geçici yayın bekletme — 13 Ekim 2026:** `vercel.json`, yalnızca `main` için otomatik Git deployment'ını kapatır. GitHub'a kod göndermek mevcut canlı siteyi değiştirmemelidir; GitHub Actions kalite kontrolleri devam eder. Bu ayar manuel deployment'ı engellemez. Production env/DB ve kabul testleri tamamlanmadan kaldırmayın. [Yedek ve geri dönüş planı](docs/MAIN_HANDOFF_2026-10-13.md).
+
 Tam anahtar listesi [.env.example](.env.example) içindedir. Üretim grupları:
 
 | Grup | Anahtarlar |
